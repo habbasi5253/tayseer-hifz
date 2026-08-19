@@ -1,11 +1,35 @@
-# Only the Vercel entrypoint lives here. Deliberately no [project] table:
-# adding one would make Vercel treat this file as the dependency source and
-# ignore requirements.txt.
-#
-# The entrypoint is given as a MODULE path rather than left to file discovery.
-# `app/main.py` is a discoverable filename, but loading it as a bare file makes
-# its own `from app.config import ...` imports depend on the project root
-# happening to be on sys.path. Naming the module makes Python import it as part
-# of the `app` package, which is unambiguous.
+# Vercel's build runs `uv lock` against this file, so a [project] table is
+# required — a pyproject.toml carrying only [tool.vercel] fails the build.
+# Dependencies therefore live here as well as in requirements.txt (which the
+# Dockerfile and local setup use); tests/test_packaging.py asserts the two
+# never drift apart.
+
+[project]
+name = "tayseer"
+version = "1.0.0"
+description = "Barnamaj Tayseer hifz tracking for students and their Muhaffiz"
+# The app runs on 3.9 locally and 3.12 on Vercel (see .python-version).
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn==0.32.1",
+    "SQLAlchemy==2.0.36",
+    "alembic==1.14.0",
+    "Jinja2==3.1.4",
+    "python-multipart==0.0.20",
+    "itsdangerous==2.2.0",
+    "reportlab==4.2.5",
+    "tzdata==2024.2",
+    "psycopg[binary]==3.2.13",
+]
+
+[tool.uv]
+# This is an application, not a library. Without this uv tries to build and
+# install the project itself, which needs packaging metadata it does not have.
+package = false
+
 [tool.vercel]
+# Declared as a module path, not left to filename discovery. `app/main.py` is a
+# name Vercel recognises, but loading it as a bare file makes its own
+# `from app.config import ...` depend on the project root being on sys.path.
 entrypoint = "app.main:app"
