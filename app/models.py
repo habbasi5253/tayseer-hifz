@@ -25,8 +25,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    true,
 )
-from sqlalchemy import text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.domain.dates import utcnow
@@ -104,9 +104,9 @@ class User(Base):
     # Reminder categories, each switchable on its own. One blanket on/off means
     # a student who finds the daily nudge annoying silences the 30-day deadline
     # warnings too — and those are the ones that actually cost them progress.
-    notify_hifz: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("1"))
-    notify_activity: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("1"))
-    notify_progress: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("1"))
+    notify_hifz: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    notify_activity: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    notify_progress: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     student: Mapped[Optional["StudentProfile"]] = relationship(

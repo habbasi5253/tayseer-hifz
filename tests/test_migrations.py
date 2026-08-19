@@ -11,6 +11,7 @@ from __future__ import annotations
 import pathlib
 
 import pytest
+import sqlalchemy as sa
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -106,3 +107,38 @@ def test_added_non_nullable_columns_carry_a_server_default():
             if "server_default" not in call and "primary_key" not in call:
                 offenders.append(f"{path.name}: {call[:70]}")
     assert offenders == [], "add_column without server_default:\n  " + "\n  ".join(offenders)
+
+
+def test_boolean_server_defaults_compile_on_postgres():
+    """A boolean default has to survive the dialect it will actually run on.
+
+    SQLite has no boolean type and takes a literal 1 happily, so
+    `server_default=sa.text("1")` passes every local test and then aborts the
+    migration on Postgres with a datatype mismatch — the schema is left behind
+    and the deploy ships code querying columns that were never added.
+
+    `sa.true()` is compiled per dialect: 1 on SQLite, true on Postgres. This
+    checks the models rather than the migration text, because the models are
+    what a future autogenerate copies from.
+    """
+    from sqlalchemy.dialects import postgresql
+    from sqlalchemy.schema import CreateTable
+
+    from app.models import Base
+
+    dialect = postgresql.dialect()
+    offenders = []
+    for table in Base.metadata.tables.values():
+        booleans = {c.name for c in table.columns if isinstance(c.type, sa.Boolean)}
+        if not booleans:
+            continue
+        for line in str(CreateTable(table).compile(dialect=dialect)).splitlines():
+            name = line.strip().split(" ")[0]
+            if name in booleans and "DEFAULT" in line:
+                default = line.split("DEFAULT", 1)[1].strip().rstrip(",").split(" ")[0]
+                if default.lower() not in {"true", "false"}:
+                    offenders.append(f"{table.name}.{name} -> DEFAULT {default}")
+    assert offenders == [], (
+        "boolean server_default is not valid Postgres; use sa.true()/sa.false():\n  "
+        + "\n  ".join(offenders)
+    )
