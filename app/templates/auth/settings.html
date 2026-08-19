@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ app_name }}{% endblock %}
+{% block subtitle %}settings{% endblock %}
+{% block body %}
+
+<form method="post" action="/settings">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  <div class="card">
+    <h3>You</h3>
+    <label for="name">Name</label>
+    <input id="name" name="name" value="{{ user.name }}" required>
+
+    <label for="timezone">Timezone</label>
+    <select id="timezone" name="timezone">
+      {% for z in zones %}<option value="{{ z }}" {{ 'selected' if user.timezone == z }}>{{ z.replace('_',' ') }}</option>{% endfor %}
+    </select>
+    <p class="hint">All 30-day countdowns are measured in calendar days in this zone.</p>
+  </div>
+
+  {% if student %}
+  <div class="card">
+    <h3>Your time budget</h3>
+    <label for="daily_minutes">Minutes a day</label>
+    <input id="daily_minutes" name="daily_minutes" type="number" min="5" max="600"
+           value="{{ student.daily_minutes }}" inputmode="numeric">
+
+    <label>Active days</label>
+    <div class="days">
+      {% for i in range(7) %}
+      <input type="checkbox" id="d{{ i }}" name="day" value="{{ i }}" {{ 'checked' if student.active_days[i] == '1' }}>
+      <label for="d{{ i }}">{{ weekday_short[i] }}</label>
+      {% endfor %}
+    </div>
+
+    <div class="grid2">
+      <div>
+        <label for="wake_hour">Usually up at</label>
+        <select id="wake_hour" name="wake_hour">
+          {% for h in range(3, 11) %}
+          <option value="{{ h }}" {{ 'selected' if student.wake_hour == h }}>{{ '%02d:00'|format(h) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="evening_hour">Evening session</label>
+        <select id="evening_hour" name="evening_hour">
+          {% for h in range(16, 24) %}
+          <option value="{{ h }}" {{ 'selected' if student.evening_hour == h }}>{{ '%02d:00'|format(h) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <p class="hint">These anchor the suggested times on your daily plan — new hifz goes in the
+      freshest slot after fajr, murajaat in the evening wind-down.</p>
+
+    
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h3>Reminders</h3>
+    <label class="pick">
+      <input type="checkbox" name="email_notifications" {{ 'checked' if user.email_notifications }}
+             style="position:static;opacity:1;width:20px;height:20px;min-height:0;accent-color:var(--primary)">
+      <span class="pick-body" style="border:0;padding:6px 0;background:transparent">
+        <span class="pick-title">Email me reminders</span>
+        <span class="pick-blurb">Daily nudge, plus warnings before pages pass 30 days.</span>
+      </span>
+    </label>
+    <label for="reminder_hour">Reminder time (your local hour)</label>
+    <select id="reminder_hour" name="reminder_hour">
+      {% for h in range(24) %}
+      <option value="{{ h }}" {{ 'selected' if user.reminder_hour == h }}>{{ '%02d:00'|format(h) }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button class="btn block" type="submit">Save settings</button>
+</form>
+
+{% if assignments %}
+<div class="card flush mt">
+  <div style="padding:16px 16px 6px"><h3 class="mb0">Your Muhaffiz</h3></div>
+  <ul class="list">
+    {% for a in assignments %}
+    <li>
+      <div class="grow">
+        <div class="t">{{ a.muhaffiz.name }}</div>
+        <div class="s">{{ 'Stage 1 — memorization' if a.stage == 'stage1' else 'Stage 2 — tasmee' }}
+          {% if a.juz %} · juz {{ a.juz }}{% endif %}</div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if student %}<a class="btn ghost block mt" href="/onboarding">Change position or Muhaffiz</a>{% endif %}
+<details class="card mt">
+  <summary style="cursor:pointer;font-size:.82rem;font-weight:650;color:var(--ink-soft)">
+    Advanced — juz order
+  </summary>
+  <p class="hint" style="margin-top:10px">
+    Juz run 1 to 30 by default, and each one opens only when the one before it has been
+    passed. If you take them in a different order, list all 30 separated by commas —
+    for example <code>30,29,28,…</code>. Leave blank for the default.
+  </p>
+  <form method="post" action="/settings">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="name" value="{{ user.name }}">
+    <input type="hidden" name="timezone" value="{{ user.timezone }}">
+    <input type="hidden" name="reminder_hour" value="{{ user.reminder_hour }}">
+    {% if user.email_notifications %}<input type="hidden" name="email_notifications" value="on">{% endif %}
+    <label for="juz_order">Custom order</label>
+    <input id="juz_order" name="juz_order" type="text" value="{{ student.juz_order or '' }}"
+           placeholder="1,2,3,… (blank = default)">
+    <button class="btn ghost block mt" type="submit">Save juz order</button>
+  </form>
+</details>
+
+<a class="btn ghost block mt" href="/logout">Sign out</a>
+<div style="height:16px"></div>
+{% endblock %}

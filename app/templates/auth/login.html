@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Sign in · {{ app_name }}{% endblock %}
+{% block body %}
+<div style="height:24px"></div>
+<div class="center" style="margin-bottom:20px">
+  <div class="big" style="color:var(--primary)">{{ app_name }}</div>
+  <p class="muted mb0">Hifz, at the pace of a real life.</p>
+</div>
+
+<div class="card">
+  <h2>Sign in</h2>
+  {% if error %}<div class="note attention" style="margin-top:10px">{{ error }}</div>{% endif %}
+  <form method="post" action="/login">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" value="{{ email or '' }}" required autocomplete="email" autofocus>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password">
+    <button class="btn block mt" type="submit">Sign in</button>
+  </form>
+</div>
+
+<p class="center muted tiny">New here? <a href="/register">Create an account</a></p>
+{% endblock %}

@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% block title %}{{ student.name }} · {{ app_name }}{% endblock %}
+{% block subtitle %}{{ 'stage 1' if stage == 'stage1' else 'stage 2' }}{% endblock %}
+{% block body %}
+
+<div class="card">
+  <div class="spread">
+    <div>
+      <div class="eyebrow">{{ 'Stage 1 — Tilawat & memorization' if stage == 'stage1' else 'Stage 2 — Hifz evaluation' }}</div>
+      <h2 style="margin-bottom:2px">{{ student.name }}</h2>
+      <p class="faint tiny mb0">
+        Marhala {{ student.marhala }} · tasmee target {{ tasmee_target }} pages ·
+        {{ streak.consistency_percent }}% consistency this month
+      </p>
+    </div>
+  </div>
+  <div class="row wrap-row mt">
+    <a class="btn sm ghost" href="/muhaffiz/student/{{ student.id }}/report.pdf">Progress report</a>
+    <a class="btn sm ghost" href="/muhaffiz">All students</a>
+    <form method="post" action="/muhaffiz/student/{{ student.id }}/reset-link" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn sm ghost" type="submit">Password reset link</button>
+    </form>
+  </div>
+</div>
+
+{# --- Juz selector --- #}
+<div class="card">
+  <label for="juzsel" style="margin-top:0">Juz</label>
+  <select id="juzsel" onchange="location.href='/muhaffiz/student/{{ student.id }}?juz='+this.value">
+    {% for j in juz_options %}
+    <option value="{{ j }}" {{ 'selected' if j == juz }}>Juz {{ j }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+{% if stage == 'stage2' and window and window.has_started %}
+<div class="card stripe {{ window.tone }}">
+  <div class="spread">
+    <div>
+      <div class="eyebrow">30-day tasmee window</div>
+      <h2 style="margin-top:2px">{{ window.countdown_text }}</h2>
+      <p class="faint tiny mb0" style="margin-top:3px">{{ window.pace_text }}</p>
+    </div>
+    <span class="pill {{ window.tone }}">{{ window.label }}</span>
+  </div>
+  <div class="bar tall mt">
+    <i class="{{ 'clay' if window.is_expired else ('amber' if window.needs_attention else '') }}"
+       style="width:{{ window.percent }}%"></i>
+  </div>
+  <p class="faint tiny" style="margin-top:6px;margin-bottom:0">
+    {{ window.passed_count }} of 20 pages recited
+    {%- if window.attempt > 1 %} · attempt {{ window.attempt }}{% endif %}
+    {%- if window.deadline %} · deadline {{ window.deadline.strftime('%d %b') }}{% endif %}
+  </p>
+  {% if window.is_expired %}
+  <div class="note attention mt" style="margin-bottom:0">
+    <strong>Window closed</strong>
+    Tasmee restarts from page 1. The next page you record will open a fresh attempt.
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# --- The decision table. Data, not a recommendation. --- #}
+<div class="card">
+  <h3>Days since last tasmee</h3>
+  <p class="faint tiny">
+    {% if stage == 'stage1' %}
+      You choose which {{ tasmee_target }} pages to hear. This is the data behind that judgment —
+      the app deliberately does not pick for you.
+    {% else %}
+      Pages nearest their 30-day deadline are the ones to prioritise.
+    {% endif %}
+  </p>
+  <div class="scroll-x">
+  <table>
+    <thead><tr><th>Page</th><th>Signed off</th><th>Last heard</th></tr></thead>
+    <tbody>
+      {% for p in pages %}
+      <tr>
+        <td><strong>p.{{ p.index }}</strong>
+          {% if p.has_weak_spot %}<span class="pill soon">note</span>{% endif %}</td>
+        <td>{{ '✓' if p.memorized else '—' }}</td>
+        <td>
+          {% if p.days_since is not none %}
+            <span class="tiny">{{ p.days_since }}d</span>
+            <span class="faint tiny">· {{ p.last_tasmee_on.strftime('%d %b') }}</span>
+          {% else %}<span class="faint tiny">never</span>{% endif %}
+        </td>
+
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% if stage == 'stage1' and face %}
+{# --- Sign-off: the batch the student is waiting on. --- #}
+<div class="card" style="{{ 'border-color:var(--amber)' if face.is_awaiting_signoff }}">
+  <div class="spread">
+    <h3 class="mb0">Sign off pages</h3>
+    <span class="pill {{ 'soon' if face.is_awaiting_signoff else 'neutral' }}">{{ face.headline }}</span>
+  </div>
+  {% if face.submitted %}
+  <p class="faint tiny" style="margin-top:8px">
+    {{ student.name }} cannot memorize anything new until you have heard these. Tick the
+    ones that passed; anything left unticked goes back to be recited again.
+  </p>
+  <form method="post" action="/muhaffiz/student/{{ student.id }}/signoff">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="juz" value="{{ juz }}">
+    {% for pg in face.submitted|sort %}
+    <label class="pick">
+      <input type="checkbox" name="page" value="{{ pg }}" checked hidden>
+      <span class="pick-body" style="display:flex;align-items:center;gap:10px">
+        <input class="chk" type="checkbox" name="ok_{{ pg }}" checked>
+        <span>
+          <span class="pick-title">Page {{ pg|pageindex }}</span>
+          <span class="pick-blurb">Ticked = signed off · unticked = recite again</span>
+        </span>
+      </span>
+    </label>
+    {% endfor %}
+    <label for="signoff_notes">Notes <span class="faint nano">(optional)</span></label>
+    <textarea id="signoff_notes" name="notes" rows="2" placeholder="Watch the madd on the last line…"></textarea>
+    <button class="btn block mt" type="submit">Record sign-off</button>
+  </form>
+  {% else %}
+  <p class="muted tiny mb0" style="margin-top:6px">
+    Nothing waiting. {{ face.signed_off|length }} of 20 pages signed off in juz {{ juz }}.
+  </p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if stage == 'stage2' and record and record.memorization_completed_at and not record.juz_passed %}
+<div class="card" style="border-color:var(--primary)">
+  <h3>Full-juz tasmee</h3>
+  <p class="muted tiny">
+    Juz {{ juz }} is fully signed off by the Stage 1 Muhaffiz. Once you have heard the whole
+    juz and are satisfied, passing it here is what opens juz {{ juz + 1 }} for
+    {{ student.name }}.
+  </p>
+  <form method="post" action="/muhaffiz/student/{{ student.id }}/pass-juz">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="juz" value="{{ juz }}">
+    <button class="btn block" type="submit">Pass juz {{ juz }}</button>
+  </form>
+</div>
+{% endif %}
+
+{% if plan %}
+<div class="card">
+  <h3>Their murajaat schedule</h3>
+  <p class="faint tiny">
+    {{ student.name }} sets this themselves. Shown here so you know what they intend to
+    bring to class.
+  </p>
+  <div class="scroll-x" style="margin-top:8px">
+  <table>
+    <tbody>
+      {% for d in range(7) %}
+      {% set rows = plan | selectattr('weekday', 'equalto', d) | list %}
+      {% if rows %}
+      <tr>
+        <td style="width:60px"><strong>{{ weekdays[d] }}</strong></td>
+        <td>{% for r in rows %}<span class="pill neutral" style="margin-right:4px">
+            {{ r.juz }}{{ '' if r.portion == 'full' else (' · 1st half' if r.portion == 'first_half' else ' · 2nd half') }}
+          </span>{% endfor %}</td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+{% if murajaat %}
+<div class="card flush">
+  <div style="padding:15px 15px 5px">
+    <h3 style="margin-bottom:2px">Murajaat classes</h3>
+    <p class="faint tiny mb0">Mark how each class went.</p>
+  </div>
+  <ul class="list">
+    {% for c in murajaat %}
+    <li>
+      <span class="badge-num {{ 'attention' if c.outcome == 'needs_work' else ('neutral' if not c.is_graded else '') }}">{{ c.juz }}</span>
+      <div class="grow">
+        <div class="t">Juz {{ c.juz }}</div>
+        <div class="s">{{ c.local_date.strftime('%a %d %b') }}{% if c.notes %} · {{ c.notes }}{% endif %}</div>
+      </div>
+      {% if c.is_graded %}
+      <span class="pill {{ 'good' if c.went_well else 'attention' }}">
+        {{ 'Went well' if c.went_well else 'More work' }}</span>
+      {% else %}
+      <form method="post" action="/muhaffiz/student/{{ student.id }}/murajaat/{{ c.id }}" class="row" style="gap:5px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn sm" name="outcome" value="good" type="submit">Good</button>
+        <button class="btn sm ghost" name="outcome" value="needs_work" type="submit">More work</button>
+      </form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{# --- Record a tasmee sitting. --- #}
+<form method="post" action="/muhaffiz/student/{{ student.id }}/tasmee">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="juz" value="{{ juz }}">
+
+  <div class="card">
+    <h3>Record a tasmee sitting</h3>
+    {% if stage == 'stage2' %}
+    <p class="faint tiny">
+      Tick each criterion that was sound. <strong>Any one unticked means the page is not
+      revalidated</strong> and its 30-day window does not reset. Add a note so the student knows
+      what to work on.
+    </p>
+    {% else %}
+    <p class="faint tiny">
+      Stage 1 tasmee is not a formal ikhtibar — pages are recorded as heard. Add a note on anything weak.
+    </p>
+    {% endif %}
+
+    {% for p in pages %}
+    {% if p.memorized %}
+    <details style="border:1px solid var(--line);border-radius:var(--r-md);margin-bottom:8px">
+      <summary style="padding:12px 14px;cursor:pointer;font-weight:600;font-size:.92rem;list-style:none">
+        <label style="display:inline-flex;align-items:center;gap:9px;margin:0;font-size:.92rem;color:var(--ink)">
+          <input type="checkbox" name="page" value="{{ p.page }}"
+                 style="width:20px;height:20px;min-height:0;accent-color:var(--primary)"
+                 onclick="event.stopPropagation()">
+          p.{{ p.index }}
+        </label>
+        <span class="faint tiny" style="float:right">
+          {{ (p.days_since ~ 'd ago') if p.days_since is not none else 'never heard' }}
+        </span>
+      </summary>
+
+      <div style="padding:0 14px 14px">
+        {% if stage == 'stage2' %}
+        <div class="crit">
+          <label><input type="checkbox" name="hifz_{{ p.page }}"><span class="box">Hifz<em>memory</em></span></label>
+          <label><input type="checkbox" name="makharij_{{ p.page }}"><span class="box">Makharij<em>pronunciation</em></span></label>
+          <label><input type="checkbox" name="tajweed_{{ p.page }}"><span class="box">Tajweed<em>ahkaam</em></span></label>
+        </div>
+        {% endif %}
+        <textarea name="notes_{{ p.page }}" rows="2" style="margin-top:8px"
+                  placeholder="Specific feedback for this page (optional)"></textarea>
+      </div>
+    </details>
+    {% endif %}
+    {% endfor %}
+
+    <label for="notes">Notes for the whole sitting</label>
+    <textarea id="notes" name="notes" rows="2" placeholder="Optional"></textarea>
+
+    <button class="btn block mt" type="submit">Record sitting</button>
+  </div>
+</form>
+
+{# --- Muhaffiz note for the student. --- #}
+<div class="card">
+  <h3>Leave a note</h3>
+  <form method="post" action="/muhaffiz/student/{{ student.id }}/note">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="juz" value="{{ juz }}">
+    <textarea name="note" rows="2" required placeholder="Something to work on in juz {{ juz }}…"></textarea>
+    <button class="btn ghost block mt" type="submit">Send note</button>
+  </form>
+
+  {% if spots %}
+  <hr class="sep">
+  <h3>Open notes</h3>
+  <ul class="list" style="margin:0 -16px -16px">
+    {% for sp in spots %}
+    <li>
+      <div class="grow">
+        <div class="t">{{ (sp.page|pagelabel) if sp.page else 'Juz ' ~ sp.juz }}</div>
+        <div class="s">{{ sp.note }}</div>
+      </div>
+      <span class="faint tiny">{{ sp.created_at|local(user.timezone, '%d %b') }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+
+{% if history %}
+<div class="card flush">
+  <div style="padding:16px 16px 6px"><h3 class="mb0">Recent sittings</h3></div>
+  <ul class="list">
+    {% for s in history %}
+    <li>
+      <div class="grow">
+        <div class="t">Juz {{ s.juz }} · {{ s.page_count }} page{{ 's' if s.page_count != 1 }}</div>
+        <div class="s">{{ s.local_date.strftime('%a %d %b') }}{% if s.notes %} · {{ s.notes }}{% endif %}</div>
+      </div>
+      {% if stage == 'stage2' %}
+      <span class="pill {{ 'good' if s.passed_count == s.page_count else 'attention' }}">
+        {{ s.passed_count }}/{{ s.page_count }} passed
+      </span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

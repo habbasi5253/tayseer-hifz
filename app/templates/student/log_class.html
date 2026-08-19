@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Murajaat class · {{ app_name }}{% endblock %}
+{% block subtitle %}murajaat class{% endblock %}
+{% block body %}
+
+<div class="card">
+  <h2>Log a murajaat class</h2>
+  <p class="muted tiny mb0">
+    Your Stage 1 Muhaffiz hears your murajaat and marks how the class went. You record that
+    it happened; the outcome is theirs to give.
+  </p>
+</div>
+
+{% if planned %}
+<div class="note info">
+  <strong>On your schedule today</strong>
+  {% for pl in planned %}Juz {{ pl.juz }}{% if pl.portion != 'full' %}
+    ({{ 'first half' if pl.portion == 'first_half' else 'second half' }}){% endif %}{{ ', ' if not loop.last }}{% endfor %}
+  — <a href="/murajaat-plan">edit schedule</a>
+</div>
+{% endif %}
+
+{% if classes %}
+<div class="card">
+  <h3>Logged today</h3>
+  {% for c in classes %}
+  <div class="done-row" {% if c.outcome == 'needs_work' %}style="background:var(--rose-soft);color:var(--rose)"{% endif %}>
+    Juz {{ c.juz }}{% if c.portion != 'full' %} ({{ '1st' if c.portion == 'first_half' else '2nd' }} half){% endif %} ·
+    {% if c.outcome == 'good' %}went well
+    {% elif c.outcome == 'needs_work' %}needs more work
+    {% else %}awaiting your Muhaffiz{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="/log-class">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="card">
+    <label for="juz">Which juz did you revise?</label>
+    <select id="juz" name="juz">
+      {% set planned_juz = planned | map(attribute='juz') | list %}
+      {% for j in available %}
+      <option value="{{ j }}" {{ 'selected' if j in planned_juz else ('selected' if not planned_juz and j == selected else '') }}>
+        Juz {{ j }}{{ ' · on today’s schedule' if j in planned_juz else '' }}
+      </option>
+      {% endfor %}
+    </select>
+
+    <label>How much of it?</label>
+    <div class="grid3">
+      <label class="pick" style="margin:0"><input type="radio" name="portion" value="full" checked>
+        <span class="pick-body center"><span class="pick-title" style="justify-content:center">Whole</span></span></label>
+      <label class="pick" style="margin:0"><input type="radio" name="portion" value="first_half">
+        <span class="pick-body center"><span class="pick-title" style="justify-content:center">1st half</span></span></label>
+      <label class="pick" style="margin:0"><input type="radio" name="portion" value="second_half">
+        <span class="pick-body center"><span class="pick-title" style="justify-content:center">2nd half</span></span></label>
+    </div>
+    <label for="note">Anything to flag? <span class="faint nano">(optional)</span></label>
+    <textarea id="note" name="note" rows="2" placeholder="Ayat order slipped in the second half…"></textarea>
+  </div>
+  <button class="btn block" type="submit">Log class</button>
+  <div style="height:16px"></div>
+</form>
+
+{% if recent %}
+<div class="card flush">
+  <div style="padding:15px 15px 5px"><h3 class="mb0">Recent classes</h3></div>
+  <ul class="list">
+    {% for c in recent %}
+    <li>
+      <span class="badge-num {{ 'attention' if c.outcome == 'needs_work' else ('neutral' if not c.is_graded else '') }}">{{ c.juz }}</span>
+      <div class="grow">
+        <div class="t">Juz {{ c.juz }}</div>
+        <div class="s">{{ c.local_date.strftime('%a %d %b') }}{% if c.notes %} · {{ c.notes }}{% endif %}</div>
+      </div>
+      <span class="pill {{ 'good' if c.outcome == 'good' else ('attention' if c.outcome == 'needs_work' else 'neutral') }}">
+        {% if c.outcome == 'good' %}Went well{% elif c.outcome == 'needs_work' %}More work{% else %}Pending{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

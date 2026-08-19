@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Set a new password · {{ app_name }}{% endblock %}
+{% block body %}
+<div style="height:24px"></div>
+<div class="center" style="margin-bottom:20px">
+  <div class="big" style="color:var(--primary)">{{ app_name }}</div>
+</div>
+
+<div class="card">
+{% if valid %}
+  <h2>Set a new password</h2>
+  <p class="muted tiny">{{ 'For ' ~ name ~ '.' if name }} This link works once.</p>
+  {% if error %}<div class="note attention">{{ error }}</div>{% endif %}
+  <form method="post">
+    <label for="password">New password</label>
+    <input id="password" name="password" type="password" required minlength="8"
+           autocomplete="new-password" autofocus>
+    <p class="hint">At least 8 characters.</p>
+    <button class="btn block mt" type="submit">Set password and sign in</button>
+  </form>
+{% else %}
+  <h2>This link no longer works</h2>
+  <p class="muted tiny">
+    Reset links expire after 72 hours and can only be used once. Ask your Muhaffiz for a
+    new one.
+  </p>
+  <a class="btn ghost block mt" href="/login">Back to sign in</a>
+{% endif %}
+</div>
+{% endblock %}

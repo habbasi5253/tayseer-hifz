@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% import "partials/components.html" as ui %}
+{% block title %}Today · {{ app_name }}{% endblock %}
+{% block subtitle %}today{% endblock %}
+{% block body %}
+
+{# --- Rhythm: where you are, and the last seven days ----------------------- #}
+<div class="hero">
+  <div class="hero-top">
+    {{ ui.ring(certs.total_percent, 64, 6) }}
+    <div class="hero-copy">
+      <div class="eyebrow">{{ today.strftime('%A %d %B') }}</div>
+      <h1>{{ certs.headline }}</h1>
+      <p>{{ streak.headline }}</p>
+    </div>
+  </div>
+  {{ ui.week_strip(week) }}
+</div>
+
+{# Time-critical, but kept to a single line so it never displaces the hifz. #}
+{% if certs.lapsed or certs.at_risk %}
+<a href="/certificates#renewals" class="card stripe {{ 'attention' if certs.lapsed else 'soon' }}"
+   style="display:flex;align-items:center;gap:11px;padding:12px 14px">
+  <span class="badge-num {{ 'attention' if certs.lapsed else 'soon' }}">
+    {{ (certs.lapsed + certs.at_risk)|length }}</span>
+  <span class="grow">
+    <span class="t" style="display:block;color:{{ 'var(--rose)' if certs.lapsed else 'var(--amber)' }}">
+      {% if certs.lapsed %}
+        {{ certs.lapsed|length }} certificate{{ 's' if certs.lapsed|length != 1 }} to renew
+      {% else %}
+        {{ certs.at_risk|length }} certificate{{ 's' if certs.at_risk|length != 1 }} due soon
+      {% endif %}
+    </span>
+    <span class="s">Pages past their 30-day window need re-reciting</span>
+  </span>
+  <span class="faint">›</span>
+</a>
+{% endif %}
+
+{# ========================================================================== #}
+{# 1. HIFZ — the actual work of the programme, first on the page.            #}
+{# ========================================================================== #}
+
+<div class="section-head">
+  <h3>Your hifz</h3>
+  <a href="/certificate/{{ student.current_juz }}">Open juz {{ student.current_juz }} →</a>
+</div>
+
+{% if face.needs_recital %}
+<div class="focus" style="border-color:var(--rose)">
+  <div class="focus-head">
+    <span class="focus-kicker" style="background:var(--rose-soft);color:var(--rose)">Recite again</span>
+    <h2>{{ face.returned|length }} page{{ 's' if face.returned|length != 1 }} came back</h2>
+    <p class="sub">{{ face.memorize_gate.reason }}</p>
+  </div>
+  <div class="focus-actions">
+    <form method="post" action="/submit-batch">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="juz" value="{{ student.current_juz }}">
+      <button class="btn block" type="submit">Recited again — send for sign-off</button>
+    </form>
+  </div>
+  <div class="focus-foot">
+    New pages stay closed until these pass. That is the gate working, not a setback.
+  </div>
+</div>
+
+{% elif face.is_awaiting_signoff %}
+<div class="focus">
+  <div class="focus-head">
+    <span class="focus-kicker" style="background:var(--amber-soft);color:var(--amber)">With your Muhaffiz</span>
+    <h2>{{ face.submitted|length }} page{{ 's' if face.submitted|length != 1 }} waiting to be heard</h2>
+    <p class="sub">
+      Juz {{ student.current_juz }} · {{ face.signed_off|length }} of 20 signed off.
+      You can carry on once they have signed these off.
+    </p>
+    <div class="bar tall mt"><i class="amber" style="width:{{ (face.signed_off|length / 20 * 100)|round|int }}%"></i></div>
+  </div>
+  <div class="focus-foot">
+    Nothing to do on new hifz today — murajaat below is the work that still moves.
+  </div>
+</div>
+
+{% elif face.all_signed_off %}
+<div class="focus">
+  <div class="focus-head">
+    <span class="focus-kicker">Ready for Stage 2</span>
+    <h2>Juz {{ student.current_juz }} fully signed off</h2>
+    <p class="sub">
+      All 20 pages passed with your Stage 1 Muhaffiz. Now tasmee the entire juz to your
+      Stage 2 Muhaffiz — their pass is what opens juz {{ student.current_juz + 1 }}.
+    </p>
+  </div>
+  <div class="focus-actions">
+    <a class="btn block" href="/certificate/{{ student.current_juz }}">Open juz {{ student.current_juz }}</a>
+  </div>
+</div>
+
+{% elif face.next_page %}
+<div class="focus">
+  <div class="focus-head">
+    <span class="focus-kicker">Today's memorization</span>
+    <h2>Juz {{ student.current_juz }}, page {{ face.next_page|pageindex }}</h2>
+    <p class="sub">
+      {{ face.signed_off|length }} of 20 signed off{% if face.batch_size %},
+      {{ face.batch_size }} ready to recite{% endif %}.
+      {{ hifz_time.start_text if hifz_time else 'Whenever you are freshest' }}{% if hifz_time %} · about {{ hifz_time.minutes }} minutes{% endif %}.
+    </p>
+    <div class="bar tall mt"><i style="width:{{ (face.signed_off|length / 20 * 100)|round|int }}%"></i></div>
+  </div>
+  <div class="focus-actions">
+    <form method="post" action="/page/memorized">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="page" value="{{ face.next_page }}">
+      <button class="btn block" type="submit">Mark page {{ face.next_page|pageindex }} memorized</button>
+    </form>
+    {% if face.batch_size %}
+    <form method="post" action="/submit-batch">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="juz" value="{{ student.current_juz }}">
+      <button class="btn ghost block" type="submit">
+        Recite {{ face.batch_size }} page{{ 's' if face.batch_size != 1 }} to your Muhaffiz
+      </button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="focus-foot">
+    Memorize as many pages as you like, then recite the batch. New pages stay open until
+    you send it — after that you wait for sign-off.
+  </div>
+</div>
+{% endif %}
+
+{# --- Today's plan, with suggested times ----------------------------------- #}
+<div class="section-head">
+  <h3>Suggested times</h3>
+  <span>{{ day.total_minutes }} min planned · {{ student.daily_minutes }} available</span>
+</div>
+
+{% if sched.verdict != 'fits' %}
+<div class="note {{ 'warn' if sched.verdict == 'trimmed' else 'attention' }}">
+  <strong>{{ sched.headline }}</strong>{{ sched.detail }}
+</div>
+{% endif %}
+
+{% for slot, items in day.by_slot %}
+<div class="slot">
+  <div class="slot-head">
+    <b>{{ slot.label }}</b>
+    <span>{{ slot.hint }}</span>
+  </div>
+  <div class="tl">
+    {% for b in items %}
+    <div class="tl-item {{ 'optional' if b.optional }}">
+      <div class="tl-time">
+        <b>{{ b.start_text.split(' ')[0] }}</b>
+        <span>{{ b.start_text.split(' ')[1] }} · {{ b.minutes }}m</span>
+      </div>
+      <div class="tl-rule"></div>
+      <div class="tl-body">
+        <b>{{ b.title }}{% if b.optional %} <span class="faint nano">optional</span>{% endif %}</b>
+        <p>{{ b.detail }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+{% if not is_active_day %}
+<div class="note info">Today is one of your days off. Rest properly — it is part of the plan.</div>
+{% endif %}
+
+{# ========================================================================== #}
+{# 2. LOGGING — what you actually did today.                                  #}
+{# ========================================================================== #}
+
+<div class="section-head">
+  <h3>Log today</h3>
+  <span>{{ revisions|length }} murajaat · {{ classes|length }} class{{ 'es' if classes|length != 1 }}</span>
+</div>
+
+<div class="card">
+  {% for r in revisions %}
+  <div class="done-row">
+    <span class="rank r{{ r.method }}">{{ r.method }}</span>
+    Juz {{ r.juz }} revised{% if r.duration_minutes %} · {{ r.duration_minutes }} min{% endif %}
+  </div>
+  {% endfor %}
+  {% for c in classes %}
+  <div class="done-row" {% if c.outcome == 'needs_work' %}style="background:var(--rose-soft);color:var(--rose)"{% endif %}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5"/></svg>
+    Murajaat class · juz {{ c.juz }} ·
+    {% if c.outcome == 'good' %}went well
+    {% elif c.outcome == 'needs_work' %}needs more work
+    {% else %}awaiting your Muhaffiz{% endif %}
+  </div>
+  {% endfor %}
+
+  <div class="grid2 {{ 'mt' if revisions or classes }}">
+    <a class="btn {{ 'ghost' if revisions else '' }}" href="/revise">
+      {{ 'Log more murajaat' if revisions else 'Log murajaat' }}
+    </a>
+    <a class="btn ghost" href="/log-class">Log murajaat class</a>
+  </div>
+  {% if not revisions and not classes %}
+  <p class="hint">
+    Two taps each. Logging is what makes the murajaat rotation and the retention
+    nudges work — nothing here is busywork.
+  </p>
+  {% endif %}
+</div>
+
+{# --- Supporting context ---------------------------------------------------- #}
+
+{% if nudge.should_nudge %}
+<div class="card stripe {{ 'attention' if nudge.severity == 'warn' else 'soon' }}">
+  <div class="eyebrow">Worth a thought</div>
+  <h2 style="font-size:.95rem;margin-top:3px">{{ nudge.headline }}</h2>
+  <p class="muted tiny mb0">{{ nudge.detail }}</p>
+</div>
+{% endif %}
+
+{% if planned_today %}
+<div class="section-head">
+  <h3>Murajaat today</h3>
+  <a href="/murajaat-plan">Edit schedule →</a>
+</div>
+<div class="card flush">
+  <ul class="list">
+    {% for pl in planned_today %}
+    <li>
+      <span class="badge-num">{{ pl.juz }}</span>
+      <div class="grow">
+        <div class="t">Juz {{ pl.juz }}{% if pl.portion != 'full' %}
+          <span class="faint tiny">· {{ 'first half' if pl.portion == 'first_half' else 'second half' }}</span>
+        {% endif %}</div>
+        <div class="s">On your schedule for {{ today.strftime('%A') }}</div>
+      </div>
+      <a class="btn sm quiet" href="/revise?juz={{ pl.juz }}">Revise</a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if open_spots %}
+<div class="section-head"><h3>Notes to work on</h3></div>
+<div class="card flush">
+  <ul class="list">
+    {% for s in open_spots %}
+    <li>
+      <div class="grow">
+        <div class="t">{{ ('Juz ' ~ s.juz ~ ', p.' ~ (s.page|pageindex)) if s.page else 'Juz ' ~ s.juz }}</div>
+        <div class="s">{{ s.note }}</div>
+      </div>
+      <form method="post" action="/weak-spot/{{ s.id }}/resolve">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn sm ghost" type="submit">Sorted</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

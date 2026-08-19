@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+tests/
+.pytest_cache/
+*.db
+*.db-wal
+*.db-shm
+screens.html
+sample-report.pdf
+.preview/
+.env

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Murajaat schedule · {{ app_name }}{% endblock %}
+{% block subtitle %}murajaat schedule{% endblock %}
+{% block body %}
+
+<div class="card">
+  <h2>Your murajaat schedule</h2>
+  <p class="muted tiny mb0">
+    Pick what to revise on each day. This drives your daily plan, and your Muhaffiz can see
+    it. A juz you find hard can be taken in halves instead of whole — the second half is
+    usually the weaker one, so it is worth scheduling on its own.
+  </p>
+</div>
+
+{% if not available %}
+<div class="card">
+  <div class="empty">
+    <div class="mark">◌</div>
+    <p>No juz to revise yet.</p>
+    <p class="tiny mb0">Juz appear here once your Stage 2 Muhaffiz has passed them.</p>
+  </div>
+</div>
+{% else %}
+<form method="post" action="/murajaat-plan">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% for d in range(7) %}
+  {% set chosen = by_day.get(d, []) %}
+  <div class="card">
+    <div class="spread">
+      <h3 class="mb0">{{ weekdays[d] }}</h3>
+      <span class="faint nano">{{ chosen|length }} scheduled</span>
+    </div>
+    <div style="margin-top:10px">
+      {% for j in available %}
+      <div class="row wrap-row" style="gap:6px;margin-bottom:6px;align-items:center">
+        <span class="badge-num neutral" style="width:30px;height:30px;font-size:.76rem">{{ j }}</span>
+        {% for pk in portions %}
+        {% set on = chosen | selectattr('juz','equalto',j) | selectattr('portion','equalto',pk) | list %}
+        <label style="margin:0">
+          <input type="checkbox" name="slot" value="{{ d }}:{{ j }}:{{ pk }}"
+                 {{ 'checked' if on }} style="position:absolute;opacity:0;pointer-events:none">
+          <span class="pill {{ 'good' if on else 'neutral' }}" style="cursor:pointer;padding:6px 11px">
+            {{ portion_label[pk] }}
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  <button class="btn block" type="submit">Save schedule</button>
+  <div style="height:20px"></div>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+  // The pill is the control; reflect its checkbox state without a round trip.
+  document.querySelectorAll('input[name="slot"]').forEach(function (box) {
+    box.addEventListener('change', function () {
+      var pill = box.nextElementSibling;
+      pill.classList.toggle('good', box.checked);
+      pill.classList.toggle('neutral', !box.checked);
+    });
+  });
+</script>
+{% endblock %}

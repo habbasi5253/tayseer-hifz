@@ -1,0 +1,92 @@
+{# Shared UI components. The certificate tile and the pipeline stepper appear on
+   almost every screen, so they live here rather than being re-typed. #}
+
+{% macro ring(percent, size=58, stroke=5, on_paper=false, tone='') %}
+  {% set r = (size - stroke) / 2 %}
+  {% set circ = 2 * 3.14159265 * r %}
+  <div class="ring {{ 'on-paper' if on_paper }} {{ 'tone-' ~ tone if tone }}" style="width:{{ size }}px;height:{{ size }}px">
+    <svg width="{{ size }}" height="{{ size }}" aria-hidden="true">
+      <circle class="track" cx="{{ size/2 }}" cy="{{ size/2 }}" r="{{ r }}" stroke-width="{{ stroke }}"/>
+      <circle class="fill" cx="{{ size/2 }}" cy="{{ size/2 }}" r="{{ r }}" stroke-width="{{ stroke }}"
+              stroke-dasharray="{{ circ }}"
+              stroke-dashoffset="{{ circ - (circ * percent / 100) }}"/>
+    </svg>
+    <b>{{ percent }}%</b>
+  </div>
+{% endmacro %}
+
+{% macro seal(kind='good') %}
+  <span class="seal {{ 'lapsed' if kind == 'attention' else ('risk' if kind == 'soon' else '') }}">
+    {% if kind == 'attention' %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
+        <path d="M12 8v5"/><circle cx="12" cy="16.5" r=".6" fill="currentColor"/></svg>
+    {% else %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 6L9 17l-5-5"/></svg>
+    {% endif %}
+  </span>
+{% endmacro %}
+
+{# The pipeline every juz walks. Steps come from the domain (Stage.ORDER), never
+   from a list kept here — that is how they drifted apart last time. #}
+{% macro pipeline(c) %}
+  <div class="pipe {{ 'tone-attention' if c.tone == 'attention' }}">
+    {% for step in c.pipeline_steps %}
+      <div class="step {{ step.state }}"><i></i><span>{{ step.label }}</span></div>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{# One certificate in the grid. #}
+{% macro cert_tile(c) %}
+  <a class="cert tone-{{ c.tone }} {{ 'is-certified' if c.is_certified }} {{ 'is-idle' if not c.is_started }}"
+     href="/certificate/{{ c.juz }}">
+    {% if c.is_certified %}{{ seal(c.tone) }}{% endif %}
+    <div class="num">Juz {{ c.juz }}</div>
+    <div class="st">{{ c.status_line }}</div>
+    {% if c.is_started %}
+    <div class="bar">
+      <i class="{{ 'clay' if c.tone == 'attention' else ('amber' if c.tone == 'soon' else ('gold' if c.is_certified else '')) }}"
+         style="width:{{ c.percent }}%"></i>
+    </div>
+    {% endif %}
+  </a>
+{% endmacro %}
+
+{% macro method_mix(mix) %}
+  {% if mix.total %}
+    {% for row in mix.breakdown() %}
+    <div class="mixrow">
+      <span class="rank r{{ row.method.rank }}">{{ row.method.rank }}</span>
+      <div class="bar"><i class="{{ '' if row.method.is_strong else ('amber' if row.method.rank == 3 else 'clay') }}"
+                          style="width:{{ row.percent }}%"></i></div>
+      <span class="faint nano">{{ row.percent }}% · {{ row.count }}</span>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="muted tiny mb0">Nothing logged yet.</p>
+  {% endif %}
+{% endmacro %}
+
+{% macro page_legend() %}
+  <div class="legend">
+    <span><i style="background:var(--primary-soft);box-shadow:inset 0 0 0 1px var(--primary)"></i>Current</span>
+    <span><i style="background:var(--amber-soft);box-shadow:inset 0 0 0 1px var(--amber)"></i>Due soon</span>
+    <span><i style="background:var(--rose)"></i>Needs re-reciting</span>
+    <span><i style="background:var(--line-soft)"></i>Not evaluated</span>
+  </div>
+{% endmacro %}
+
+{# The habit strip: last seven days. Today is always rendered "open", never
+   missed — the day is not over, and a tracker that marks you failed at 9am is
+   a tracker people delete. #}
+{% macro week_strip(days) %}
+  <div class="weekstrip">
+    {% for d in days %}
+    <div class="daydot {{ d.state }}" title="{{ d.day.strftime('%a %d %b') }}">
+      <i>{% if d.state == 'done' %}✓{% elif d.state == 'off' %}·{% else %}{{ d.day.day }}{% endif %}</i>
+      <span>{{ d.letter }}</span>
+    </div>
+    {% endfor %}
+  </div>
+{% endmacro %}

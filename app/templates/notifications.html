@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Notifications · {{ app_name }}{% endblock %}
+{% block subtitle %}notifications{% endblock %}
+{% block body %}
+
+<div class="card">
+  <div class="spread">
+    <h2 class="mb0">Notifications</h2>
+    {% if unread %}
+    <form method="post" action="/notifications/read">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn sm ghost" type="submit">Mark all read</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if items %}
+{% for n in items %}
+<div class="card stripe {{ 'attention' if n.severity == 'attention' else ('soon' if n.severity in ('warn','soon') else 'good') }}"
+     style="{{ 'opacity:.62' if n.is_read }}">
+  <div class="spread">
+    <h3 style="margin-bottom:4px;text-transform:none;letter-spacing:0;font-size:.95rem;color:var(--ink)">{{ n.title }}</h3>
+    <span class="faint tiny" style="flex:none">{{ n.created_at|local(user.timezone, '%d %b') }}</span>
+  </div>
+  <p class="muted tiny" style="white-space:pre-line;margin-bottom:0">{{ n.body }}</p>
+  {% if n.url %}<a class="btn sm quiet mt" href="{{ n.url }}">Open</a>{% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="card">
+  <div class="empty">
+    <div class="mark">◔</div>
+    <p class="mb0">Nothing yet.<br><span class="tiny">Reminders and 30-day warnings will appear here.</span></p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

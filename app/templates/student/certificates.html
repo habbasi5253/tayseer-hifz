@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% import "partials/components.html" as ui %}
+{% block title %}Certificates · {{ app_name }}{% endblock %}
+{% block subtitle %}certificates{% endblock %}
+{% block body %}
+
+<div class="hero">
+  <div class="hero-top">
+    {{ ui.ring(certs.total_percent, 66, 6) }}
+    <div class="hero-copy">
+      <div class="eyebrow">Barnamaj Tayseer</div>
+      <h1>{{ certs.certified|length }} of 30 certified</h1>
+      <p>One juz, one certification. A juz is certified once all 20 of its pages have
+         passed hifz, makharij and tajweed with your Stage 2 Muhaffiz.</p>
+    </div>
+  </div>
+  <div class="hero-stats">
+    <div><b>{{ certs.held_current|length }}</b><span>Held &amp; current</span></div>
+    <div><b>{{ certs.in_progress|length }}</b><span>In progress</span></div>
+    <div><b>{{ certs.not_started|length }}</b><span>Not started</span></div>
+  </div>
+</div>
+
+{# --- Renewal queue: certifications the 30-day rule is about to take back --- #}
+<a id="renewals"></a>
+{% if certs.needs_attention %}
+<div class="section-head">
+  <h3>Needs renewing</h3>
+  <a href="/thirty-day">Page detail →</a>
+</div>
+<div class="card flush">
+  <ul class="list">
+    {% for c in certs.needs_attention %}
+    <li class="stripe {{ c.tone }}">
+      <span class="badge-num {{ c.tone }}">{{ c.juz }}</span>
+      <div class="grow">
+        <a class="t" href="/certificate/{{ c.juz }}">Juz {{ c.juz }}</a>
+        <div class="s">{{ c.next_action }}</div>
+      </div>
+      <span class="pill {{ c.tone }}">{{ c.health_label }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if certs.in_progress %}
+<div class="section-head"><h3>In progress</h3></div>
+<div class="certgrid">
+  {% for c in certs.in_progress %}{{ ui.cert_tile(c) }}{% endfor %}
+</div>
+{% endif %}
+
+{% if certs.certified %}
+<div class="section-head">
+  <h3>Certified</h3>
+  <span class="faint tiny">{{ certs.held_current|length }} current</span>
+</div>
+<div class="certgrid">
+  {% for c in certs.certified %}{{ ui.cert_tile(c) }}{% endfor %}
+</div>
+{% endif %}
+
+<div class="section-head"><h3>All 30</h3></div>
+<div class="certgrid">
+  {% for c in certs.items %}{{ ui.cert_tile(c) }}{% endfor %}
+</div>
+
+<div class="card mt">
+  <h3>How certification works</h3>
+  <p class="muted tiny">
+    Each juz moves through three steps: <strong>memorization</strong>, reciting each page
+    to your Stage 1 Muhaffiz until the whole juz is signed off; <strong>tasmee</strong> of
+    the entire juz to a different Stage 2 Muhaffiz within 30 days; then
+    <strong>passed</strong>, which opens the next juz.
+  </p>
+  <p class="muted tiny mb0">
+    The 30-day clock starts when your Stage 1 Muhaffiz signs off the last page. If the
+    whole juz is not passed inside it, tasmee for that juz starts again from page 1 — that
+    is the 30-day rule doing its job.
+  </p>
+</div>
+
+<a class="btn ghost block mt" href="/report.pdf">Download progress report (PDF)</a>
+{% endblock %}

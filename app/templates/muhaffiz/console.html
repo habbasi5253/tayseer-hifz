@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Students · {{ app_name }}{% endblock %}
+{% block subtitle %}muhaffiz{% endblock %}
+{% block body %}
+
+<div class="card">
+  <h2>Your students</h2>
+  <p class="muted tiny mb0">
+    {{ stage1_count }} in Stage 1 · {{ stage2_count }} in Stage 2.
+    Students needing something from you are listed first.
+  </p>
+</div>
+
+{% if rows %}
+{% for r in rows %}
+<a href="/muhaffiz/student/{{ r.student.id }}" style="text-decoration:none;color:inherit">
+  <div class="card stripe {{ 'attention' if r.needs_attention else 'good' }}">
+    <div class="spread">
+      <div style="min-width:0">
+        <div class="t" style="font-weight:650">{{ r.student.name }}</div>
+        <div class="s faint tiny">
+          {{ 'Stage 1' if r.stage == 'stage1' else 'Stage 2' }} ·
+          Marhala {{ r.student.marhala }} ·
+          {{ r.certs.certified|length }}/30 certified ·
+          {{ r.pages_memorized }} pages memorized
+        </div>
+      </div>
+      {% if r.needs_attention %}
+        <span class="pill attention">{{ r.needs_attention }} due</span>
+      {% else %}
+        <span class="pill good">On track</span>
+      {% endif %}
+    </div>
+
+    {% if r.stage == 'stage2' and r.board.total_in_scope %}
+    <div class="bar thin mt">
+      <i class="{{ 'clay' if r.board.overdue_pages else '' }}" style="width:{{ r.board.percent_current }}%"></i>
+    </div>
+    <p class="faint tiny" style="margin-top:6px;margin-bottom:0">{{ r.board.headline }}</p>
+    {% else %}
+    <p class="faint tiny" style="margin-top:8px;margin-bottom:0">
+      Last logged revision {{ r.streak.last_logged.strftime('%d %b') if r.streak.last_logged else 'never' }}
+      · {{ r.streak.consistency_percent }}% consistency this month
+    </p>
+    {% endif %}
+  </div>
+</a>
+{% endfor %}
+{% else %}
+<div class="card">
+  <div class="empty">
+    <div class="mark">◌</div>
+    <p>No students assigned yet.</p>
+    <p class="tiny mb0">A student links you from their setup page, choosing you as their Stage 1 or
+      Stage 2 Muhaffiz.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5c46">
+<title>{% block title %}{{ app_name }}{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="manifest" href="/static/manifest.json">
+</head>
+<body>
+
+{% if user %}
+<header class="top">
+  <div class="top-inner">
+    <a class="mark-logo" href="/" aria-label="{{ app_name }} home">T</a>
+    <a class="brand" href="/">
+      <b>{{ app_name }}</b>
+      <span>{% block subtitle %}{% endblock %}</span>
+    </a>
+    <div class="top-spacer"></div>
+    <a class="bell" href="/notifications" aria-label="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
+      </svg>
+      {% if unread %}<span class="dot">{{ unread|length }}</span>{% endif %}
+    </a>
+  </div>
+</header>
+{% endif %}
+
+<main class="wrap">
+{% block body %}{% endblock %}
+</main>
+
+{% if user %}
+<nav class="tabs">
+  {% set p = request.url.path %}
+  {% if user.student %}
+  <a href="/" class="{{ 'on' if p == '/' }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    Today</a>
+  <a href="/revise" class="{{ 'on' if p.startswith('/revise') }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+    Revise</a>
+  <a href="/certificates" class="{{ 'on' if p.startswith('/certificate') }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M8.5 14.5L7 22l5-2.5L17 22l-1.5-7.5"/></svg>
+    Certificates</a>
+  <a href="/progress" class="{{ 'on' if p.startswith('/progress') }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><rect x="5" y="11" width="4" height="9"/><rect x="10" y="5" width="4" height="15"/><rect x="15" y="14" width="4" height="6"/></svg>
+    Progress</a>
+  {% endif %}
+  {% if user.muhaffiz %}
+  <a href="/muhaffiz" class="{{ 'on' if p.startswith('/muhaffiz') }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+    Students</a>
+  {% endif %}
+  <a href="/settings" class="{{ 'on' if p.startswith('/settings') }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.35.4.64.73.83"/></svg>
+    Settings</a>
+</nav>
+{% endif %}
+
+{% set flash = request.cookies.get('flash') %}
+{% set flash_error = request.cookies.get('flash_error') %}
+{% if flash or flash_error %}
+<div class="flash {{ 'err' if flash_error }}">{{ flash_error or flash }}</div>
+<script>
+  // One-shot: clear the cookie so the message does not reappear on back-nav.
+  document.cookie = "flash=; Max-Age=0; path=/";
+  document.cookie = "flash_error=; Max-Age=0; path=/";
+  setTimeout(function () {
+    var f = document.querySelector('.flash');
+    if (f) { f.style.transition = 'opacity .3s'; f.style.opacity = '0'; setTimeout(function(){ f.remove(); }, 300); }
+  }, 4000);
+</script>
+{% endif %}
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

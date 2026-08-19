@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Reset link · {{ app_name }}{% endblock %}
+{% block subtitle %}reset link{% endblock %}
+{% block body %}
+
+<div class="card">
+  <div class="eyebrow">Password reset</div>
+  <h2>A one-time link for {{ student.name }}</h2>
+  <p class="muted tiny">
+    Send this to them however you normally talk. It works once and expires in
+    {{ hours }} hours. <strong>It is shown here only now</strong> — if it gets lost,
+    generate a new one.
+  </p>
+
+  <div style="margin-top:12px;padding:12px 13px;background:var(--surface-2);
+              border:1px solid var(--line);border-radius:var(--r-md);
+              font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;
+              word-break:break-all;line-height:1.5">{{ link }}</div>
+
+  <button class="btn block mt" type="button"
+          onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent.trim()).then(()=>{this.textContent='Copied'})">
+    Copy link
+  </button>
+  <a class="btn ghost block mt" href="/muhaffiz/student/{{ student.id }}">Back to {{ student.name }}</a>
+</div>
+{% endblock %}

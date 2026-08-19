@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% import "partials/components.html" as ui %}
+{% block title %}Progress · {{ app_name }}{% endblock %}
+{% block subtitle %}progress{% endblock %}
+{% block body %}
+
+<div class="card">
+  <div class="eyebrow">{{ s.marhala.label }}</div>
+  <h2>{{ s.pages_memorized }} pages memorized</h2>
+  <div class="bar mt"><i style="width:{{ s.percent_memorized }}%"></i></div>
+  <p class="faint tiny" style="margin-top:6px">{{ s.percent_memorized }}% of 600 · Stage 1</p>
+
+  <div class="bar thin" style="margin-top:12px">
+    <i class="amber" style="width:{{ s.percent_revalidated }}%"></i></div>
+  <p class="faint tiny" style="margin-top:6px;margin-bottom:0">
+    {{ s.pages_revalidated }} revalidated in Stage 2 ({{ s.percent_revalidated }}%) —
+    evaluation trails memorization, which is how the programme is meant to run.
+  </p>
+</div>
+
+<div class="grid3" style="margin-bottom:14px">
+  <div class="card center" style="margin-bottom:0">
+    <div class="mid">{{ s.juz_memorized }}</div><div class="faint tiny">Juz memorized</div>
+  </div>
+  <div class="card center" style="margin-bottom:0">
+    <div class="mid">{{ s.streak.longest_run }}</div><div class="faint tiny">Longest run</div>
+  </div>
+  <div class="card center" style="margin-bottom:0">
+    <div class="mid">{{ s.streak.consistency_percent }}%</div><div class="faint tiny">Consistency</div>
+  </div>
+</div>
+
+{# --- Are you on track? ---------------------------------------------------- #}
+<div class="card">
+  <h3>Time per page</h3>
+  <p class="mb0" style="font-size:1.02rem">{{ track.pace.summary }}</p>
+  {% if track.pace.has_pace %}
+  <p class="faint tiny" style="margin-top:6px;margin-bottom:0">
+    From {{ track.pace.pages_counted }} pages signed off over {{ track.pace.span_days }} days.
+    {% if track.projected_juz_finish %}
+      Juz {{ student.current_juz }} finishes around
+      {{ track.projected_juz_finish.strftime('%d %b %Y') }} at this rate
+      ({{ track.current_juz_signed_off }} of 20 signed off).
+    {% endif %}
+  </p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="spread">
+    <h3 class="mb0">Murajaat classes</h3>
+    <span class="faint nano">last 4 weeks</span>
+  </div>
+  <p class="muted tiny" style="margin-top:8px">{{ track.attendance.summary }}</p>
+  {% if track.attendance.expected %}
+  <div style="margin-top:10px">
+    {% for w in track.attendance.weeks %}
+    <div class="mixrow" style="grid-template-columns:56px 1fr 62px">
+      <span class="faint nano">{{ w.label }}</span>
+      <div class="bar">
+        <i class="{{ '' if w.missed == 0 else ('amber' if w.missed <= 1 else 'clay') }}"
+           style="width:{{ w.percent }}%"></i>
+      </div>
+      <span class="faint nano">{{ w.attended }}/{{ w.expected }}{% if w.missed %} · {{ w.missed }} missed{% endif %}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="hint">
+    Scheduled from <a href="/murajaat-plan">your murajaat plan</a>, counting only days that
+    have passed. Missing one does not hold up your progress through the programme.
+  </p>
+  {% else %}
+  <a class="btn ghost block mt" href="/murajaat-plan">Set a murajaat schedule</a>
+  {% endif %}
+</div>
+
+{% if track.juz_rows %}
+<div class="card flush">
+  <div style="padding:15px 15px 5px"><h3 class="mb0">Progress per juz</h3></div>
+  <ul class="list">
+    {% for r in track.juz_rows %}
+    <li>
+      <span class="badge-num {{ 'neutral' if not r.is_complete }}">{{ r.juz }}</span>
+      <div class="grow">
+        <div class="t">{{ r.status }}</div>
+        <div class="s">
+          {{ r.signed_off }}/20 signed off{% if r.recited %} · {{ r.recited }}/20 recited{% endif %}
+          {%- if r.days_taken is not none %} · {{ r.days_taken }} days{% endif %}
+        </div>
+        <div class="bar" style="margin-top:6px"><i style="width:{{ r.signed_off_percent }}%"></i></div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{# --- The juz map. --- #}
+<div class="card">
+  <h3>Juz map</h3>
+  <div class="juzgrid">
+    {% for row in map %}
+    <a class="juztile t-{{ row.stage }} {{ 'risk' if row.summary and not row.summary.is_current }}"
+       href="/juz/{{ row.juz }}"
+       title="Juz {{ row.juz }} — {{ row.stage }}, {{ row.memorized_pages }}/20 pages">
+      {{ row.juz }}
+      {% if row.memorized_pages and row.stage != 'complete' %}<small>{{ row.memorized_pages }}/20</small>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  <div class="row wrap-row" style="margin-top:12px;gap:12px">
+    <span class="faint tiny"><span class="pill good">Stage 2</span></span>
+    <span class="faint tiny"><span class="pill soon">Memorizing</span></span>
+    <span class="faint tiny"><span class="pill attention">Needs attention</span></span>
+    <span class="faint tiny"><span class="pill neutral">Not started</span></span>
+  </div>
+</div>
+
+{# --- Method mix. --- #}
+<div class="card">
+  <div class="spread"><h3 class="mb0">Revision method mix</h3><span class="faint tiny">last 30 days</span></div>
+  {% if mix.total %}
+  <div class="mt">
+    {% for row in mix.breakdown() %}
+    <div class="mixrow">
+      <span class="rank r{{ row.method.rank }}">{{ row.method.rank }}</span>
+      <div class="bar"><i class="{{ '' if row.method.is_strong else ('amber' if row.method.rank == 3 else 'clay') }}"
+                          style="width:{{ row.percent }}%"></i></div>
+      <span class="faint tiny">{{ row.percent }}%</span>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="faint tiny mb0">
+    {{ (mix.strong_share * 100)|round|int }}% of {{ mix.total }} sessions used methods 1–2 (tasmee to
+    someone, or from memory).
+    {% if mix.strong_share < 0.3 %} Shifting a few sessions there would strengthen retention.{% endif %}
+  </p>
+  {% else %}
+  <p class="muted tiny mb0">No revisions logged in the last 30 days.</p>
+  {% endif %}
+</div>
+
+{# --- Rotation coverage: the guide's central murajaat warning. --- #}
+{% if rotation %}
+<div class="card flush">
+  <div style="padding:16px 16px 6px">
+    <h3 style="margin-bottom:2px">Rotation coverage</h3>
+    <p class="faint tiny mb0">Completed juz, least recently revised first.</p>
+  </div>
+  <ul class="list">
+    {% for r in rotation %}
+    <li class="stripe {{ 'attention' if r.status in ('neglected','never') else ('soon' if r.status == 'cooling' else 'good') }}">
+      <div class="grow">
+        <div class="t">Juz {{ r.juz }}</div>
+        <div class="s">Last revised {{ r.days_since|humandays }} · {{ r.revision_count }} sessions</div>
+      </div>
+      <a class="btn sm quiet" href="/revise?juz={{ r.juz }}">Revise</a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if spots %}
+<div class="card flush">
+  <div style="padding:16px 16px 6px"><h3 class="mb0">Open notes</h3></div>
+  <ul class="list">
+    {% for sp in spots %}
+    <li>
+      <div class="grow">
+        <div class="t">{{ (sp.page|pagelabel) if sp.page else 'Juz ' ~ sp.juz }}</div>
+        <div class="s">{{ sp.note }}</div>
+      </div>
+      <form method="post" action="/weak-spot/{{ sp.id }}/resolve">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn sm ghost" type="submit">Sorted</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<a class="btn ghost block" href="/report.pdf">Download progress report (PDF)</a>
+<p class="center faint tiny mt">Presentable enough to hand to your Muhaffiz or coordinator.</p>
+<div style="height:12px"></div>
+{% endblock %}
