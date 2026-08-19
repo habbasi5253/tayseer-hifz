@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional
+from urllib.parse import quote, unquote
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -34,6 +35,7 @@ templates.env.filters["humandays"] = dt.humanize_days
 templates.env.filters["pagelabel"] = label_page
 templates.env.filters["juzname"] = juz_name
 templates.env.filters["pageindex"] = page_index_in_juz
+templates.env.filters["urldecode"] = lambda v: unquote(v) if v else v
 
 
 class Redirect(Exception):
@@ -104,12 +106,18 @@ def render(request: Request, template: str, ctx: dict):
 
 
 def redirect(url: str, flash: Optional[str] = None, error: bool = False) -> RedirectResponse:
-    """Post/Redirect/Get, carrying a one-shot message in a short-lived cookie."""
+    """Post/Redirect/Get, carrying a one-shot message in a short-lived cookie.
+
+    The message is percent-encoded because cookie values are limited to
+    Latin-1. The app's own copy is full of em dashes and curly quotes, and one
+    of them in a flash message raised UnicodeEncodeError *after* the work had
+    already been committed — so the action succeeded and the user saw a 500.
+    """
     resp = RedirectResponse(url, status_code=status.HTTP_303_SEE_OTHER)
     if flash:
         resp.set_cookie(
             "flash_error" if error else "flash",
-            flash,
+            quote(flash, safe=""),
             max_age=10,
             httponly=True,
             samesite="lax",

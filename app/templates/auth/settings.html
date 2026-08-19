@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Settings · {{ app_name }}{% endblock %}
-{% block subtitle %}settings{% endblock %}
+{% block subtitle %}Settings{% endblock %}
 {% block body %}
 
 <form method="post" action="/settings">
@@ -9,9 +9,9 @@
   <div class="card">
     <h3>You</h3>
     <label for="name">Name</label>
-    <input id="name" name="name" value="{{ user.name }}" required>
+    <input id="name" name="name" type="text" value="{{ user.name }}" required>
 
-    <label for="timezone">Timezone</label>
+    <label for="timezone">Time zone</label>
     <select id="timezone" name="timezone">
       {% for z in zones %}<option value="{{ z }}" {{ 'selected' if user.timezone == z }}>{{ z.replace('_',' ') }}</option>{% endfor %}
     </select>
@@ -20,12 +20,15 @@
 
   {% if student %}
   <div class="card">
-    <h3>Your time budget</h3>
-    <label for="daily_minutes">Minutes a day</label>
-    <input id="daily_minutes" name="daily_minutes" type="number" min="5" max="600"
-           value="{{ student.daily_minutes }}" inputmode="numeric">
+    <h3>Your time</h3>
+    <label for="daily_hours">Time you have on a normal day</label>
+    <select id="daily_hours" name="daily_hours">
+      {% for h in hour_choices %}
+      <option value="{{ h }}" {{ 'selected' if current_hours == h }}>{{ format_hours(h) }}</option>
+      {% endfor %}
+    </select>
 
-    <label>Active days</label>
+    <label>Days you will work</label>
     <div class="days">
       {% for i in range(7) %}
       <input type="checkbox" id="d{{ i }}" name="day" value="{{ i }}" {{ 'checked' if student.active_days[i] == '1' }}>
@@ -60,41 +63,69 @@
 
   <div class="card">
     <h3>Reminders</h3>
+    <p class="faint tiny" style="margin-bottom:10px">
+      Each kind can be turned off on its own, so silencing the daily nudge does not also
+      silence a deadline that costs you a juz.
+    </p>
+
+    <label class="pick">
+      <input type="checkbox" name="notify_hifz" {{ 'checked' if user.notify_hifz }}
+             style="position:static;opacity:1;width:20px;height:20px;min-height:0;accent-color:var(--primary)">
+      <span class="pick-body" style="border:0;padding:6px 0;background:transparent">
+        <span class="pick-title">Hifz deadlines</span>
+        <span class="pick-blurb">
+          Your 30-day tasmee window: a week out, three days, one day, and the last day.
+          These are the ones worth keeping on.
+        </span>
+      </span>
+    </label>
+
+    <label class="pick">
+      <input type="checkbox" name="notify_activity" {{ 'checked' if user.notify_activity }}
+             style="position:static;opacity:1;width:20px;height:20px;min-height:0;accent-color:var(--primary)">
+      <span class="pick-body" style="border:0;padding:6px 0;background:transparent">
+        <span class="pick-title">Daily activity</span>
+        <span class="pick-blurb">
+          A nudge on your working days when nothing has been logged yet. Skipped entirely
+          on days you have already logged.
+        </span>
+      </span>
+    </label>
+
+    <label class="pick">
+      <input type="checkbox" name="notify_progress" {{ 'checked' if user.notify_progress }}
+             style="position:static;opacity:1;width:20px;height:20px;min-height:0;accent-color:var(--primary)">
+      <span class="pick-body" style="border:0;padding:6px 0;background:transparent">
+        <span class="pick-title">Progress updates</span>
+        <span class="pick-blurb">
+          Retention nudges when your revision drifts toward reading and listening, and
+          milestones as you pass them.
+        </span>
+      </span>
+    </label>
+
     <label class="pick">
       <input type="checkbox" name="email_notifications" {{ 'checked' if user.email_notifications }}
              style="position:static;opacity:1;width:20px;height:20px;min-height:0;accent-color:var(--primary)">
       <span class="pick-body" style="border:0;padding:6px 0;background:transparent">
-        <span class="pick-title">Email me reminders</span>
-        <span class="pick-blurb">Daily nudge, plus warnings before pages pass 30 days.</span>
+        <span class="pick-title">Also send these by email</span>
+        <span class="pick-blurb">Otherwise they stay in the app.</span>
       </span>
     </label>
-    <label for="reminder_hour">Reminder time (your local hour)</label>
+
+    <label for="reminder_hour">Reminder time</label>
     <select id="reminder_hour" name="reminder_hour">
       {% for h in range(24) %}
       <option value="{{ h }}" {{ 'selected' if user.reminder_hour == h }}>{{ '%02d:00'|format(h) }}</option>
       {% endfor %}
     </select>
+    <p class="hint">Your local time.</p>
   </div>
 
   <button class="btn block" type="submit">Save settings</button>
 </form>
 
-{% if assignments %}
-<div class="card flush mt">
-  <div style="padding:16px 16px 6px"><h3 class="mb0">Your Muhaffiz</h3></div>
-  <ul class="list">
-    {% for a in assignments %}
-    <li>
-      <div class="grow">
-        <div class="t">{{ a.muhaffiz.name }}</div>
-        <div class="s">{{ 'Stage 1 — memorization' if a.stage == 'stage1' else 'Stage 2 — tasmee' }}
-          {% if a.juz %} · juz {{ a.juz }}{% endif %}</div>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
-</div>
-{% endif %}
+
 
 {% if student %}<a class="btn ghost block mt" href="/onboarding">Change position or Muhaffiz</a>{% endif %}
 <details class="card mt">

@@ -26,6 +26,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.domain.dates import utcnow
@@ -99,6 +100,13 @@ class User(Base):
     is_muhaffiz: Mapped[bool] = mapped_column(Boolean, default=False)
     email_notifications: Mapped[bool] = mapped_column(Boolean, default=True)
     reminder_hour: Mapped[int] = mapped_column(Integer, default=19)  # local hour
+
+    # Reminder categories, each switchable on its own. One blanket on/off means
+    # a student who finds the daily nudge annoying silences the 30-day deadline
+    # warnings too — and those are the ones that actually cost them progress.
+    notify_hifz: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("1"))
+    notify_activity: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("1"))
+    notify_progress: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("1"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     student: Mapped[Optional["StudentProfile"]] = relationship(
@@ -308,6 +316,9 @@ class DailyRevisionLog(Base):
         ForeignKey("student_profiles.id", ondelete="CASCADE"), index=True
     )
     juz: Mapped[int] = mapped_column(Integer)
+    # "full", "first_half" or "second_half" — a hard juz is often revised in
+    # halves, and the log should say which half rather than round up to a lie.
+    portion: Mapped[str] = mapped_column(String(16), default="full", server_default="full")
     method: Mapped[int] = mapped_column(Integer)  # 1..5, see domain/revision.py
     kind: Mapped[str] = mapped_column(String(16), default=RevisionKind.HALI)
     duration_minutes: Mapped[int] = mapped_column(Integer, default=0)

@@ -200,7 +200,8 @@ def sweep_student(
 
     # 1. A juz whose 30 days ran out. The most consequential thing in the app:
     #    tasmee for that juz starts again from page 1.
-    for w in board.expired:
+    if user.notify_hifz:
+      for w in board.expired:
         n = notify(
             db,
             user,
@@ -221,7 +222,8 @@ def sweep_student(
 
     # 2. Windows crossing a warning threshold today — 7, 3, 1 and 0 days out.
     #    Thresholds rather than a daily message, so this stays a signal.
-    for warn in rv.deadline_warnings(board):
+    if user.notify_hifz:
+      for warn in rv.deadline_warnings(board):
         w, lead = warn["window"], warn["lead"]
         when = {0: "today is the last day", 1: "1 day left", 3: "3 days left",
                 7: "1 week left"}.get(lead, f"{lead} days left")
@@ -243,7 +245,7 @@ def sweep_student(
 
     # 3. Retention-risk nudge on revision method.
     nudge = services.method_nudge_for(db, student, juz=student.current_juz, now=now)
-    if nudge.should_nudge:
+    if user.notify_progress and nudge.should_nudge:
         n = notify(
             db,
             user,
@@ -261,7 +263,7 @@ def sweep_student(
     # 4. The daily nudge to revise and log — only on active days, and only if
     #    they have not already logged. Nobody needs a reminder to do the thing
     #    they already did.
-    if dt.is_active_day(student.active_days, today):
+    if user.notify_activity and dt.is_active_day(student.active_days, today):
         streak = services.streak_for(db, student, now=now)
         if not streak.logged_today:
             n = notify(

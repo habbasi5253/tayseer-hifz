@@ -83,3 +83,26 @@ def test_env_takes_its_url_from_the_app_config():
 def test_alembic_is_a_production_dependency():
     """It runs at startup locally and from scripts/migrate.py in production."""
     assert "alembic" in (ROOT / "requirements.txt").read_text()
+
+
+def test_added_non_nullable_columns_carry_a_server_default():
+    """Adding NOT NULL without one is refused outright by the database.
+
+    `default=` on a model column is applied by Python when the ORM builds a row.
+    It does nothing for an ALTER TABLE against rows that already exist, so the
+    migration has no value to backfill with. Caught locally on SQLite; Postgres
+    rejects it too.
+    """
+    import re
+
+    offenders = []
+    for path in (ROOT / "migrations" / "versions").glob("*.py"):
+        src = path.read_text()
+        for call in re.findall(r"sa\.Column\([^\n]*nullable=False[^\n]*\)", src):
+            if "add_column" not in src.split(call)[0].rsplit("\n", 2)[-2:][0] and \
+               "batch_op.add_column" not in src.split(call)[0][-200:] and \
+               "op.add_column" not in src.split(call)[0][-200:]:
+                continue
+            if "server_default" not in call and "primary_key" not in call:
+                offenders.append(f"{path.name}: {call[:70]}")
+    assert offenders == [], "add_column without server_default:\n  " + "\n  ".join(offenders)

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Create account · {{ app_name }}{% endblock %}
+{% block title %}Create your account · {{ app_name }}{% endblock %}
 {% block body %}
 <div style="height:24px"></div>
 <div class="center" style="margin-bottom:20px">
@@ -12,7 +12,7 @@
   {% if error %}<div class="note attention" style="margin-top:10px">{{ error }}</div>{% endif %}
   <form method="post" action="/register">
     <label for="name">Your name</label>
-    <input id="name" name="name" value="{{ name or '' }}" required autocomplete="name">
+    <input id="name" name="name" type="text" value="{{ name or '' }}" required autocomplete="name">
 
     <label for="email">Email</label>
     <input id="email" name="email" type="email" value="{{ email or '' }}" required autocomplete="email">
@@ -21,34 +21,11 @@
     <input id="password" name="password" type="password" required autocomplete="new-password" minlength="8">
     <p class="hint">At least 8 characters.</p>
 
-    <label for="timezone">Timezone</label>
+    <label for="timezone">Time zone</label>
     <select id="timezone" name="timezone" required>
-      {% for z in zones %}<option value="{{ z }}">{{ z.replace('_',' ') }}</option>{% endfor %}
+      {% for z in zones %}<option value="{{ z }}">{{ z.replace('_', ' ') }}</option>{% endfor %}
     </select>
     <p class="hint">Every 30-day countdown is measured in your own local days, so this matters.</p>
-
-    <label>I am joining as</label>
-    <label class="pick">
-      <input type="radio" name="role" value="student" {{ 'checked' if role != 'muhaffiz' and role != 'both' else '' }}>
-      <span class="pick-body">
-        <span class="pick-title">A student</span>
-        <span class="pick-blurb">Doing hifz, logging revision and tasmee.</span>
-      </span>
-    </label>
-    <label class="pick">
-      <input type="radio" name="role" value="muhaffiz" {{ 'checked' if role == 'muhaffiz' else '' }}>
-      <span class="pick-body">
-        <span class="pick-title">A Muhaffiz</span>
-        <span class="pick-blurb">Hearing pages, signing them off, and taking tasmee for one or more students.</span>
-      </span>
-    </label>
-    <label class="pick">
-      <input type="radio" name="role" value="both" {{ 'checked' if role == 'both' else '' }}>
-      <span class="pick-body">
-        <span class="pick-title">Both</span>
-        <span class="pick-blurb">You are memorizing yourself and also teaching others.</span>
-      </span>
-    </label>
 
     <button class="btn block mt" type="submit">Create account</button>
   </form>

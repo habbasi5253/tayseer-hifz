@@ -67,3 +67,38 @@ def test_sqlite_is_the_default_without_a_database_url(monkeypatch):
         del sys.modules[name]
     s = importlib.import_module("app.config").settings
     assert s.is_sqlite is True
+
+
+# --- Flash messages -----------------------------------------------------------
+
+
+def test_a_flash_message_survives_non_latin1_characters():
+    """Regression: an em dash in a flash message 500'd *after* the commit.
+
+    Cookie values are Latin-1 only. The app's copy is full of em dashes, so
+    "Logged Juz 7 — second half." raised UnicodeEncodeError on set_cookie —
+    the work was already saved and the user still saw a server error.
+    """
+    from urllib.parse import unquote
+
+    from app.deps import redirect
+
+    msg = "Logged Juz 7 — second half. 3 days running."
+    resp = redirect("/", msg)
+    raw = resp.raw_headers
+    cookie = next(v.decode("latin-1") for k, v in raw if k == b"set-cookie")
+    assert "flash=" in cookie
+    value = cookie.split("flash=", 1)[1].split(";", 1)[0]
+    assert unquote(value) == msg
+
+
+def test_an_error_flash_is_encoded_the_same_way():
+    from urllib.parse import unquote
+
+    from app.deps import redirect
+
+    msg = "Juz 3 has not been passed — the next one stays closed."
+    resp = redirect("/", msg, error=True)
+    cookie = next(v.decode("latin-1") for k, v in resp.raw_headers if k == b"set-cookie")
+    assert "flash_error=" in cookie
+    assert unquote(cookie.split("flash_error=", 1)[1].split(";", 1)[0]) == msg

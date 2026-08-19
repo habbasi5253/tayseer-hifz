@@ -108,16 +108,11 @@ def revise_form(request: Request, juz: Optional[int] = None, db: Session = Depen
         return redirect("/muhaffiz")
 
     now = dt.utcnow()
-    records = services.all_juz_records(db, student.id)
-    available = sorted(
-        j for j, r in records.items() if r.stage in (JuzStage.MEMORIZING, JuzStage.STAGE2, JuzStage.COMPLETE)
-    ) or [student.current_juz]
-
-    selected = juz if juz in available else student.current_juz
-    if selected not in available:
-        selected = available[0]
-
-    rotation = services.rotation_entries(db, student, now=now)
+    available = services.revisable_juz(db, student) or [student.current_juz]
+    selected = juz if juz in available else (
+        student.current_juz if student.current_juz in available else available[0]
+    )
+    today = dt.today_local(user.timezone, now)
 
     return render(
         request,
@@ -131,8 +126,7 @@ def revise_form(request: Request, juz: Optional[int] = None, db: Session = Depen
             "selected": selected,
             "mix": services.method_mix_for(db, student, juz=selected, now=now),
             "nudge": services.method_nudge_for(db, student, juz=selected, now=now),
-            "rotation": rotation,
-            "suggestion": rotation[0] if rotation else None,
+            "planned": services.planned_murajaat_for(db, student, today),
             "recent": services.recent_revision_logs(db, student.id, limit=8),
             "streak": services.streak_for(db, student, now=now),
         },
@@ -140,36 +134,50 @@ def revise_form(request: Request, juz: Optional[int] = None, db: Session = Depen
 
 
 @router.post("/revise")
-def log_revision(
-    request: Request,
-    csrf_token: str = Form(...),
-    juz: int = Form(...),
-    method: int = Form(...),
-    duration_minutes: int = Form(0),
-    kind: str = Form(RevisionKind.HALI),
-    note: Optional[str] = Form(None),
-    db: Session = Depends(get_session),
-):
+async def log_revision(request: Request, db: Session = Depends(get_session)):
+    """Log murajaat.
+
+    Accepts several juz at once, each with a portion, because a real session is
+    often "juz 3 and the second half of juz 7" rather than one neat unit. The
+    method is optional — the point is to record that the revision happened, and
+    demanding a taxonomy first is how logging gets skipped.
+    """
     user = require_user(request, db)
-    check_csrf(request, csrf_token)
+    form = await request.form()
+    check_csrf(request, form.get("csrf_token"))
     student = user.student
     if not student:
         return redirect("/")
 
-    services.log_revision(
-        db,
-        student,
-        juz=int(juz),
-        method=int(method),
-        duration_minutes=int(duration_minutes or 0),
-        kind=kind,
-        note=note,
-    )
+    # Each entry arrives as "juz:portion" from the picker.
+    entries = []
+    for raw in form.getlist("juz_portion"):
+        try:
+            juz, portion = raw.split(":")
+            entries.append((int(juz), portion))
+        except (ValueError, TypeError):
+            continue
+    if not entries:
+        return redirect("/revise", "Pick at least one juz to log.", error=True)
+
+    raw_method = (form.get("method") or "").strip()
+    method = int(raw_method) if raw_method else student.preferred_method
+    duration = form.get("duration_minutes") or 0
+    note = (form.get("note") or "").strip() or None
+
+    for juz, portion in entries:
+        services.log_revision(
+            db, student, juz=juz, method=method,
+            duration_minutes=int(duration or 0),
+            kind=RevisionKind.ROTATION, note=note, portion=portion,
+        )
     db.commit()
 
-    m = get_method(int(method))
     streak = services.streak_for(db, student)
-    msg = f"Juz {juz} logged — {m.short}."
+    label = ", ".join(portion_label(j, p) for j, p in entries[:3])
+    if len(entries) > 3:
+        label += f" and {len(entries) - 3} more"
+    msg = f"Logged {label}."
     if streak.current_run > 1:
         msg += f" {streak.current_run} days running."
     return redirect("/", msg)
@@ -268,6 +276,7 @@ def certificate_detail(juz: int, request: Request, db: Session = Depends(get_ses
             "student": student,
             "c": c,
             "window": c.window if c else None,
+            "face": services.juz_workface(db, student, juz),
             "pages": services.stage1_page_view(db, student, juz, now=now),
             "mix": services.method_mix_for(db, student, juz=juz, now=now),
             "spots": services.open_weak_spots(db, student.id, juz=juz),
@@ -328,8 +337,7 @@ def murajaat_plan_form(request: Request, db: Session = Depends(get_session)):
     if not student:
         return redirect("/muhaffiz")
 
-    records = services.all_juz_records(db, student.id)
-    available = sorted(j for j, r in records.items() if r.juz_passed) or []
+    available = services.revisable_juz(db, student)
     plan = services.murajaat_plan(db, student.id)
     by_day = {}
     for row in plan:
@@ -430,7 +438,165 @@ def log_class(
     return redirect("/", "Murajaat class logged — your Muhaffiz will mark how it went.")
 
 
-# --- Student-initiated checkpoints# --- Student-initiated checkpoints & progress marking ------------------------
+@router.post("/record-signoff")
+async def record_signoff(request: Request, db: Session = Depends(get_session)):
+    """Record what the Muhaffiz signed off in class.
+
+    There are no Muhaffiz logins: this is the student's own record of the
+    decision. The programme's gates still apply — a returned page still blocks
+    new memorization — they are simply driven from here.
+    """
+    user = require_user(request, db)
+    form = await request.form()
+    check_csrf(request, form.get("csrf_token"))
+    student = user.student
+    if not student:
+        return redirect("/")
+
+    juz = int(form.get("juz") or student.current_juz)
+    passed, returned = [], []
+    for raw in form.getlist("page"):
+        page = int(raw)
+        (passed if form.get(f"ok_{page}") is not None else returned).append(page)
+
+    if not passed and not returned:
+        return redirect("/", "Select at least one page.", error=True)
+    try:
+        services.record_signoff(db, student, passed_pages=passed, returned_pages=returned)
+    except services.ProgramRuleViolation as exc:
+        db.rollback()
+        return redirect("/", str(exc), error=True)
+    db.commit()
+
+    msg = f"{len(passed)} page{'s' if len(passed) != 1 else ''} signed off"
+    if returned:
+        msg += f", {len(returned)} to recite again"
+    return redirect(f"/certificate/{juz}", msg + ".")
+
+
+@router.post("/record-tasmee")
+async def record_tasmee(request: Request, db: Session = Depends(get_session)):
+    """Record pages recited to the Stage 2 Muhaffiz."""
+    user = require_user(request, db)
+    form = await request.form()
+    check_csrf(request, form.get("csrf_token"))
+    student = user.student
+    if not student:
+        return redirect("/")
+
+    juz = int(form.get("juz") or student.current_juz)
+    pages = [int(p) for p in form.getlist("page")]
+    if not pages:
+        return redirect(f"/certificate/{juz}", "Select at least one page.", error=True)
+    try:
+        services.record_tasmee_pages(db, student, juz, pages=pages)
+    except services.ProgramRuleViolation as exc:
+        db.rollback()
+        return redirect(f"/certificate/{juz}", str(exc), error=True)
+    db.commit()
+    return redirect(f"/certificate/{juz}",
+                    f"{len(pages)} page{'s' if len(pages) != 1 else ''} recorded.")
+
+
+@router.post("/record-juz-passed")
+def record_juz_passed(
+    request: Request,
+    csrf_token: str = Form(...),
+    juz: int = Form(...),
+    db: Session = Depends(get_session),
+):
+    """Record that the Stage 2 Muhaffiz passed the whole juz. Opens the next one."""
+    user = require_user(request, db)
+    check_csrf(request, csrf_token)
+    student = user.student
+    if not student:
+        return redirect("/")
+    services.pass_juz_tasmee(db, student, int(juz), muhaffiz_id=None)
+    db.commit()
+    nxt = services.next_juz_after(student, int(juz))
+    return redirect("/", f"Juz {juz} passed." + (f" Juz {nxt} is now open." if nxt else ""))
+
+
+# --- Student-initiated checkpoints@router.post("/record-signoff")
+async def record_signoff(request: Request, db: Session = Depends(get_session)):
+    """Record what the Muhaffiz signed off in class.
+
+    There are no Muhaffiz logins: this is the student's own record of the
+    decision. The programme's gates still apply — a returned page still blocks
+    new memorization — they are simply driven from here.
+    """
+    user = require_user(request, db)
+    form = await request.form()
+    check_csrf(request, form.get("csrf_token"))
+    student = user.student
+    if not student:
+        return redirect("/")
+
+    juz = int(form.get("juz") or student.current_juz)
+    passed, returned = [], []
+    for raw in form.getlist("page"):
+        page = int(raw)
+        (passed if form.get(f"ok_{page}") is not None else returned).append(page)
+
+    if not passed and not returned:
+        return redirect("/", "Select at least one page.", error=True)
+    try:
+        services.record_signoff(db, student, passed_pages=passed, returned_pages=returned)
+    except services.ProgramRuleViolation as exc:
+        db.rollback()
+        return redirect("/", str(exc), error=True)
+    db.commit()
+
+    msg = f"{len(passed)} page{'s' if len(passed) != 1 else ''} signed off"
+    if returned:
+        msg += f", {len(returned)} to recite again"
+    return redirect(f"/certificate/{juz}", msg + ".")
+
+
+@router.post("/record-tasmee")
+async def record_tasmee(request: Request, db: Session = Depends(get_session)):
+    """Record pages recited to the Stage 2 Muhaffiz."""
+    user = require_user(request, db)
+    form = await request.form()
+    check_csrf(request, form.get("csrf_token"))
+    student = user.student
+    if not student:
+        return redirect("/")
+
+    juz = int(form.get("juz") or student.current_juz)
+    pages = [int(p) for p in form.getlist("page")]
+    if not pages:
+        return redirect(f"/certificate/{juz}", "Select at least one page.", error=True)
+    try:
+        services.record_tasmee_pages(db, student, juz, pages=pages)
+    except services.ProgramRuleViolation as exc:
+        db.rollback()
+        return redirect(f"/certificate/{juz}", str(exc), error=True)
+    db.commit()
+    return redirect(f"/certificate/{juz}",
+                    f"{len(pages)} page{'s' if len(pages) != 1 else ''} recorded.")
+
+
+@router.post("/record-juz-passed")
+def record_juz_passed(
+    request: Request,
+    csrf_token: str = Form(...),
+    juz: int = Form(...),
+    db: Session = Depends(get_session),
+):
+    """Record that the Stage 2 Muhaffiz passed the whole juz. Opens the next one."""
+    user = require_user(request, db)
+    check_csrf(request, csrf_token)
+    student = user.student
+    if not student:
+        return redirect("/")
+    services.pass_juz_tasmee(db, student, int(juz), muhaffiz_id=None)
+    db.commit()
+    nxt = services.next_juz_after(student, int(juz))
+    return redirect("/", f"Juz {juz} passed." + (f" Juz {nxt} is now open." if nxt else ""))
+
+
+# --- Student-initiated checkpoints & progress marking ------------------------
 
 
 @router.post("/page/memorized")

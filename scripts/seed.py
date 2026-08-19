@@ -34,7 +34,6 @@ from app.domain import dates as dt  # noqa: E402
 from app.domain.quran import global_page, juz_pages  # noqa: E402
 from app import services as S  # noqa: E402
 from app.models import (  # noqa: E402
-    MuhaffizProfile,
     RevisionKind,
     Stage,
     StudentProfile,
@@ -64,21 +63,7 @@ def main() -> None:
         is_student=True,
         reminder_hour=20,
     )
-    m1_user = User(
-        email="muhaffiz1@example.com",
-        name="Shk Adam Ahmed",
-        password_hash=hash_password(PASSWORD),
-        timezone="America/Chicago",
-        is_muhaffiz=True,
-    )
-    m2_user = User(
-        email="muhaffiz2@example.com",
-        name="Shk Hatim Poonawalla",
-        password_hash=hash_password(PASSWORD),
-        timezone="Asia/Karachi",  # deliberately a different zone from the student
-        is_muhaffiz=True,
-    )
-    db.add_all([student_user, m1_user, m2_user])
+    db.add(student_user)
     db.flush()
 
     student = StudentProfile(
@@ -90,16 +75,11 @@ def main() -> None:
         preferred_method=2,
         started_at=now - timedelta(days=150),
     )
-    m1 = MuhaffizProfile(user_id=m1_user.id, bio="Stage 1 — memorization and sign-off")
-    m2 = MuhaffizProfile(user_id=m2_user.id, bio="Stage 2 — hifz evaluation")
-    db.add_all([student, m1, m2])
+    db.add(student)
     db.flush()
-
-    S.assign_muhaffiz(db, student_id=student.id, muhaffiz_id=m1.id, stage=Stage.ONE)
-    S.assign_muhaffiz(db, student_id=student.id, muhaffiz_id=m2.id, stage=Stage.TWO)
     db.commit()
 
-    def sign_off_juz(juz, first_day, m1_id):
+    def sign_off_juz(juz, first_day, _unused=None):
         """Stage 1 for a whole juz: batches of two, recited and signed off."""
         for b in range(0, 20, 2):
             when = now - timedelta(days=first_day - b)
@@ -107,7 +87,7 @@ def main() -> None:
                 S.mark_page_memorized(db, student, global_page(juz, i), when=when)
             S.submit_batch(db, student, juz, when=when)
             S.sign_off_pages(
-                db, student, muhaffiz_id=m1_id,
+                db, student, muhaffiz_id=None,
                 passed_pages=[global_page(juz, b + 1), global_page(juz, b + 2)], when=when,
             )
 
@@ -115,7 +95,7 @@ def main() -> None:
         """Recite `pages` of a juz to Muhaffiz 2, one page a day."""
         for i, idx in enumerate(pages):
             S.record_tasmee(
-                db, student, stage=Stage.TWO, juz=juz, muhaffiz_id=m2.id,
+                db, student, stage=Stage.TWO, juz=juz, muhaffiz_id=None,
                 page_results=[{"page": global_page(juz, idx), "hifz": True,
                                "makharij": True, "tajweed": True}],
                 when=now - timedelta(days=first_day - i),
@@ -126,19 +106,19 @@ def main() -> None:
     # juz open. The seed follows that order because the gates now enforce it.
 
     # --- Juz 1: clean run ----------------------------------------------------
-    sign_off_juz(1, 150, m1.id)
+    sign_off_juz(1, 150)
     tasmee_juz(1, range(1, 21), 128)
-    S.pass_juz_tasmee(db, student, 1, muhaffiz_id=m2.id, when=now - timedelta(days=106))
+    S.pass_juz_tasmee(db, student, 1, muhaffiz_id=None, when=now - timedelta(days=106))
     db.commit()
 
     # --- Juz 2: the rule bites -----------------------------------------------
     # Thirteen pages in, life happened, and the 30 days ran out. Picking it back
     # up restarts the attempt from page 1 — `record_tasmee` does that on the next
     # sitting, and the abandoned attempt stays in the record for both Muhaffiz.
-    sign_off_juz(2, 100, m1.id)
+    sign_off_juz(2, 100)
     tasmee_juz(2, range(1, 14), 76)
     tasmee_juz(2, range(1, 21), 25)
-    S.pass_juz_tasmee(db, student, 2, muhaffiz_id=m2.id, when=now - timedelta(days=4))
+    S.pass_juz_tasmee(db, student, 2, muhaffiz_id=None, when=now - timedelta(days=4))
     db.commit()
 
     # --- Juz 3: in Stage 1, one batch sitting with Muhaffiz 1 ----------------
@@ -147,7 +127,7 @@ def main() -> None:
         for i in (b + 1, b + 2):
             S.mark_page_memorized(db, student, global_page(3, i), when=when)
         S.submit_batch(db, student, 3, when=when)
-        S.sign_off_pages(db, student, muhaffiz_id=m1.id,
+        S.sign_off_pages(db, student, muhaffiz_id=None,
                          passed_pages=[global_page(3, b + 1), global_page(3, b + 2)], when=when)
     for i in (11, 12):
         S.mark_page_memorized(db, student, global_page(3, i), when=now - timedelta(days=1))
@@ -164,11 +144,11 @@ def main() -> None:
     ])
     for d, juz, outcome in ((3, 1, "good"), (6, 2, "needs_work"), (10, 1, "good")):
         S.log_murajaat_class(
-            db, student, juz=juz, portion="full", muhaffiz_id=m1.id, outcome=outcome,
+            db, student, juz=juz, portion="full", muhaffiz_id=None, outcome=outcome,
             notes="Order of ayats slipped in the second half." if outcome == "needs_work" else None,
             when=now - timedelta(days=d),
         )
-    S.log_murajaat_class(db, student, juz=2, muhaffiz_id=m1.id, when=now)  # awaiting a grade
+    S.log_murajaat_class(db, student, juz=2, muhaffiz_id=None, when=now)  # awaiting a grade
     db.commit()
 
     # --- Revision logs: recently drifting toward passive methods -------------
@@ -194,9 +174,7 @@ def main() -> None:
 
     board = S.build_board(db, student)
     print("Seeded.\n")
-    print(f"  Student   student@example.com    / {PASSWORD}")
-    print(f"  Stage 1   muhaffiz1@example.com  / {PASSWORD}")
-    print(f"  Stage 2   muhaffiz2@example.com  / {PASSWORD}\n")
+    print(f"  student@example.com / {PASSWORD}\n")
     print(f"  Juz 3 Stage 1: {S.juz_workface(db, student, 3).headline}")
     print(f"  Tasmee board:  {board.headline}")
     for w in board.windows:

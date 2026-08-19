@@ -648,6 +648,7 @@ def log_revision(
     duration_minutes: int = 0,
     kind: str = RevisionKind.HALI,
     note: Optional[str] = None,
+    portion: str = "full",
     when: Optional[datetime] = None,
 ) -> DailyRevisionLog:
     when = when or dt.utcnow()
@@ -655,6 +656,7 @@ def log_revision(
     row = DailyRevisionLog(
         student_id=student.id,
         juz=juz,
+        portion=normalize_portion(portion),
         method=int(method),
         kind=kind,
         duration_minutes=max(0, int(duration_minutes or 0)),
@@ -1418,3 +1420,128 @@ def tracking_summary(
         ),
         "current_juz_signed_off": len(face.signed_off),
     }
+
+
+# --- Self-recorded progress --------------------------------------------------
+# This is a student's own log. There are no Muhaffiz accounts: the student
+# records what happened in class — which pages were signed off, which were
+# recited in tasmee, when a juz was passed. The programme's gates still apply
+# (a batch must be signed off before new pages, a juz must be passed before the
+# next opens, the 30-day window still runs), they are simply driven by the
+# student's own record rather than a second login.
+
+
+def record_signoff(
+    db: Session,
+    student: StudentProfile,
+    *,
+    passed_pages: Sequence[int],
+    returned_pages: Sequence[int] = (),
+    notes: Optional[str] = None,
+    when: Optional[datetime] = None,
+) -> Dict[str, List[int]]:
+    """The student records what their Muhaffiz signed off."""
+    return sign_off_pages(
+        db, student, muhaffiz_id=None,
+        passed_pages=passed_pages, returned_pages=returned_pages,
+        notes=notes, when=when,
+    )
+
+
+def record_tasmee_pages(
+    db: Session,
+    student: StudentProfile,
+    juz: int,
+    *,
+    pages: Sequence[int],
+    when: Optional[datetime] = None,
+) -> TasmeeSession:
+    """The student records pages recited to their Stage 2 Muhaffiz."""
+    return record_tasmee(
+        db, student, stage=Stage.TWO, juz=juz, muhaffiz_id=None,
+        page_results=[
+            {"page": p, "hifz": True, "makharij": True, "tajweed": True} for p in pages
+        ],
+        when=when,
+    )
+
+
+def backfill_prior_juz(
+    db: Session,
+    student: StudentProfile,
+    up_to_juz: int,
+    *,
+    when: Optional[datetime] = None,
+) -> List[int]:
+    """Mark every juz before `up_to_juz` in the student's order as complete.
+
+    Somebody joining at juz 10 has already memorized the nine before it; making
+    them tick 180 pages to say so would be absurd. Their sequence decides what
+    "before" means, so a student working backwards from 30 gets 30..11 filled in
+    rather than 1..9.
+
+    Only juz with no record at all are touched, so re-running this can never
+    overwrite real progress.
+    """
+    when = when or dt.utcnow()
+    tz = student_timezone(student)
+    order = list(juz_order_for(student))
+    try:
+        cutoff = order.index(up_to_juz)
+    except ValueError:
+        return []
+
+    filled = []
+    for juz in order[:cutoff]:
+        record = get_juz_record(db, student.id, juz)
+        if record.juz_passed or record.memorization_completed_at:
+            continue
+
+        for page in juz_pages(juz):
+            row = db.execute(
+                select(PageProgress).where(
+                    PageProgress.student_id == student.id, PageProgress.page == page
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                row = PageProgress(student_id=student.id, page=page, juz=juz)
+                db.add(row)
+            row.memorized_at = row.memorized_at or when
+            row.memorized_on = row.memorized_on or dt.local_date(when, tz)
+            row.submitted_at = None
+            row.returned_at = None
+            row.signed_off_at = row.signed_off_at or when
+            row.stage2_entered_at = row.stage2_entered_at or when
+
+        record.memorization_started_at = record.memorization_started_at or when
+        record.memorization_completed_at = record.memorization_completed_at or when
+        record.stage2_started_at = record.stage2_started_at or when
+        record.stage2_completed_at = record.stage2_completed_at or when
+        record.tasmee_window_started_at = record.tasmee_window_started_at or when
+        record.juz_tasmee_passed_at = when
+        record.stage = JuzStage.COMPLETE
+        filled.append(juz)
+
+    db.flush()
+    return filled
+
+
+def revisable_juz(db: Session, student: StudentProfile) -> List[int]:
+    """Juz the student can put on a murajaat schedule.
+
+    Anything they have memorized, not only what has been passed. Waiting for a
+    juz to be passed before it could be revised left new students staring at an
+    empty schedule screen with nothing to choose.
+    """
+    records = all_juz_records(db, student.id)
+    out = {
+        j for j, r in records.items()
+        if r.juz_passed or r.memorization_completed_at or r.stage == JuzStage.COMPLETE
+    }
+    counts = db.execute(
+        select(PageProgress.juz)
+        .where(PageProgress.student_id == student.id, PageProgress.memorized_at.is_not(None))
+        .distinct()
+    ).all()
+    out.update(j for (j,) in counts)
+    return sorted(out)

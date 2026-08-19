@@ -1,12 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Log revision · {{ app_name }}{% endblock %}
-{% block subtitle %}revise{% endblock %}
+{% import "partials/components.html" as ui %}
+{% block title %}Log murajaat · {{ app_name }}{% endblock %}
+{% block subtitle %}Murajaat{% endblock %}
 {% block body %}
 
 <div class="card">
-  <h2>Log a revision</h2>
-  <p class="muted tiny mb0">Two taps and you're done. Duration is optional.</p>
+  <h2>Log murajaat</h2>
+  <p class="muted tiny mb0">
+    Pick everything you revised. A juz can be whole or half — tap once for the whole juz,
+    or choose a half if that is all you covered.
+  </p>
 </div>
+
+{% if planned %}
+<div class="note info">
+  <strong>On your schedule today</strong>
+  {% for p in planned %}Juz {{ p.juz }}{% if p.portion != 'full' %}
+    ({{ 'first half' if p.portion == 'first_half' else 'second half' }}){% endif %}{{ ', ' if not loop.last }}{% endfor %}
+</div>
+{% endif %}
 
 {% if nudge.should_nudge %}
 <div class="note {{ 'attention' if nudge.severity == 'warn' else 'warn' }}">
@@ -18,98 +30,91 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
   <div class="card">
-    <label for="juz">Which juz</label>
-    <select id="juz" name="juz" required>
+    <h3>What did you revise?</h3>
+    <div class="juzpick">
       {% for j in available %}
-      <option value="{{ j }}" {{ 'selected' if j == selected }}>Juz {{ j }}</option>
+      {% set on_plan = planned | selectattr('juz', 'equalto', j) | list %}
+      <div class="juzpick-row {{ 'is-planned' if on_plan }}">
+        <span class="juzpick-num">{{ j }}</span>
+        <div class="juzpick-opts">
+          <label>
+            <input type="checkbox" name="juz_portion" value="{{ j }}:full"
+                   {{ 'checked' if j == selected and not on_plan }}>
+            <span>Whole</span>
+          </label>
+          <label>
+            <input type="checkbox" name="juz_portion" value="{{ j }}:first_half">
+            <span>1st half</span>
+          </label>
+          <label>
+            <input type="checkbox" name="juz_portion" value="{{ j }}:second_half">
+            <span>2nd half</span>
+          </label>
+        </div>
+      </div>
       {% endfor %}
-    </select>
-    {% if suggestion and suggestion.juz != selected %}
-    <p class="hint">
-      Juz {{ suggestion.juz }} was last revised {{ suggestion.days_since|humandays }} —
-      <a href="/revise?juz={{ suggestion.juz }}">revise that instead?</a>
-    </p>
-    {% endif %}
-
-    <label style="margin-top:14px">Which part of murajaat</label>
-    <div class="grid2">
-      <label class="pick" style="margin:0">
-        <input type="radio" name="kind" value="hali" checked>
-        <span class="pick-body center"><span class="pick-title" style="justify-content:center">Juz al hali</span>
-          <span class="pick-blurb">Current juz</span></span>
-      </label>
-      <label class="pick" style="margin:0">
-        <input type="radio" name="kind" value="rotation">
-        <span class="pick-body center"><span class="pick-title" style="justify-content:center">Rotation</span>
-          <span class="pick-blurb">An older juz</span></span>
-      </label>
     </div>
+    <p class="hint">Pick as many as you covered. Juz appear here once you have memorized them.</p>
   </div>
 
   <div class="card">
-    <h3>How did you revise it?</h3>
-    {% for m in methods %}
-    <label class="pick">
-      <input type="radio" name="method" value="{{ m.rank }}"
-             {{ 'checked' if m.rank == student.preferred_method }}>
-      <span class="pick-body">
-        <span class="pick-title"><span class="rank r{{ m.rank }}">{{ m.rank }}</span>{{ m.short }}</span>
-        <span class="pick-blurb">{{ m.blurb }}</span>
-      </span>
-    </label>
-    {% endfor %}
-    <p class="hint">Ranked most to least effective for retention. Method 5 on a tired day still beats skipping.</p>
-  </div>
+    <div class="spread">
+      <h3 class="mb0">How did you revise it?</h3>
+      <span class="pill neutral">Optional</span>
+    </div>
+    <p class="faint tiny" style="margin-top:6px">
+      Skip this if you would rather just record that it happened. Method 1 or 2 is what
+      builds retention, but a logged session always beats an unlogged one.
+    </p>
+    <div style="margin-top:10px">
+      {% for m in methods %}
+      <label class="pick">
+        <input type="radio" name="method" value="{{ m.rank }}"
+               {{ 'checked' if m.rank == student.preferred_method }}>
+        <span class="pick-body">
+          <span class="pick-title"><span class="rank r{{ m.rank }}">{{ m.rank }}</span>{{ m.short }}</span>
+          <span class="pick-blurb">{{ m.blurb }}</span>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
 
-  <div class="card">
-    <label for="duration_minutes">How long? <span class="faint tiny">(optional)</span></label>
+    <label for="duration_minutes">How long? <span class="faint nano">Optional</span></label>
     <input id="duration_minutes" name="duration_minutes" type="number" min="0" max="600"
-           inputmode="numeric" placeholder="e.g. 20">
-    <label for="note">Anything weak? <span class="faint tiny">(optional)</span></label>
-    <textarea id="note" name="note" rows="2" placeholder="Mixed up the ayat order near the end…"></textarea>
+           inputmode="numeric" placeholder="e.g. 20 minutes">
+
+    <label for="note">Anything weak? <span class="faint nano">Optional</span></label>
+    <textarea id="note" name="note" rows="2"
+              placeholder="Mixed up the ayat order near the end…"></textarea>
   </div>
 
   <button class="btn block" type="submit">Log it</button>
   <div style="height:16px"></div>
 </form>
 
-{# --- Method mix so the nudge has visible evidence behind it. --- #}
 <div class="card">
   <div class="spread">
-    <h3 class="mb0">Your mix — juz {{ selected }}</h3>
-    <span class="faint tiny">last {{ mix.window_days }} days</span>
+    <h3 class="mb0">Your method mix</h3>
+    <span class="faint nano">Last {{ mix.window_days }} days</span>
   </div>
-  {% if mix.total %}
-  <div class="mt">
-    {% for row in mix.breakdown() %}
-    <div class="mixrow">
-      <span class="rank r{{ row.method.rank }}">{{ row.method.rank }}</span>
-      <div class="bar"><i class="{{ '' if row.method.is_strong else ('amber' if row.method.rank == 3 else 'clay') }}"
-                          style="width:{{ row.percent }}%"></i></div>
-      <span class="faint tiny">{{ row.percent }}%</span>
-    </div>
-    {% endfor %}
-  </div>
-  <p class="faint tiny mb0">
-    {{ (mix.strong_share * 100)|round|int }}% of {{ mix.total }} sessions used methods 1–2.
-  </p>
-  {% else %}
-  <p class="muted tiny mb0">Nothing logged for this juz yet.</p>
-  {% endif %}
+  <div style="margin-top:10px">{{ ui.method_mix(mix) }}</div>
 </div>
 
 {% if recent %}
 <div class="card flush">
-  <div style="padding:16px 16px 6px"><h3 class="mb0">Recent</h3></div>
+  <div style="padding:15px 15px 5px"><h3 class="mb0">Recent</h3></div>
   <ul class="list">
     {% for r in recent %}
     <li>
       <span class="rank r{{ r.method }}">{{ r.method }}</span>
       <div class="grow">
-        <div class="t">Juz {{ r.juz }}</div>
-        <div class="s">{{ r.local_date.strftime('%a %d %b') }}{% if r.duration_minutes %} · {{ r.duration_minutes }} min{% endif %}</div>
+        <div class="t">Juz {{ r.juz }}{% if r.portion != 'full' %}
+          <span class="faint tiny">· {{ '1st' if r.portion == 'first_half' else '2nd' }} half</span>
+        {% endif %}</div>
+        <div class="s">
+          {{ r.local_date.strftime('%a %d %b') }}{% if r.duration_minutes %} · {{ r.duration_minutes }} min{% endif %}
+        </div>
       </div>
-      {% if r.kind == 'rotation' %}<span class="pill neutral">rotation</span>{% endif %}
     </li>
     {% endfor %}
   </ul>

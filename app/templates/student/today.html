@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "partials/components.html" as ui %}
 {% block title %}Today · {{ app_name }}{% endblock %}
-{% block subtitle %}today{% endblock %}
+{% block subtitle %}Today{% endblock %}
 {% block body %}
 
 {# --- Rhythm: where you are, and the last seven days ----------------------- #}
@@ -68,16 +68,16 @@
 {% elif face.is_awaiting_signoff %}
 <div class="focus">
   <div class="focus-head">
-    <span class="focus-kicker" style="background:var(--amber-soft);color:var(--amber)">With your Muhaffiz</span>
-    <h2>{{ face.submitted|length }} page{{ 's' if face.submitted|length != 1 }} waiting to be heard</h2>
+    <span class="focus-kicker" style="background:var(--amber-soft);color:var(--amber)">Waiting to be heard</span>
+    <h2>{{ face.submitted|length }} page{{ 's' if face.submitted|length != 1 }} ready to recite</h2>
     <p class="sub">
       Juz {{ student.current_juz }} · {{ face.signed_off|length }} of 20 signed off.
-      You can carry on once they have signed these off.
+      Record the outcome once your Muhaffiz has heard them.
     </p>
     <div class="bar tall mt"><i class="amber" style="width:{{ (face.signed_off|length / 20 * 100)|round|int }}%"></i></div>
   </div>
-  <div class="focus-foot">
-    Nothing to do on new hifz today — murajaat below is the work that still moves.
+  <div class="focus-actions">
+    <a class="btn block" href="/certificate/{{ student.current_juz }}#signoff">Record what was signed off</a>
   </div>
 </div>
 
@@ -87,8 +87,8 @@
     <span class="focus-kicker">Ready for Stage 2</span>
     <h2>Juz {{ student.current_juz }} fully signed off</h2>
     <p class="sub">
-      All 20 pages passed with your Stage 1 Muhaffiz. Now tasmee the entire juz to your
-      Stage 2 Muhaffiz — their pass is what opens juz {{ student.current_juz + 1 }}.
+      All 20 pages are signed off. Now tasmee the whole juz to your second Muhaffiz —
+      their pass is what opens the next juz.
     </p>
   </div>
   <div class="focus-actions">
@@ -119,14 +119,14 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="juz" value="{{ student.current_juz }}">
       <button class="btn ghost block" type="submit">
-        Recite {{ face.batch_size }} page{{ 's' if face.batch_size != 1 }} to your Muhaffiz
+        Mark {{ face.batch_size }} page{{ 's' if face.batch_size != 1 }} as recited
       </button>
     </form>
     {% endif %}
   </div>
   <div class="focus-foot">
-    Memorize as many pages as you like, then recite the batch. New pages stay open until
-    you send it — after that you wait for sign-off.
+    Memorize as many pages as you like, then mark them recited. New pages open again once
+    you record that your Muhaffiz signed them off.
   </div>
 </div>
 {% endif %}
@@ -134,7 +134,7 @@
 {# --- Today's plan, with suggested times ----------------------------------- #}
 <div class="section-head">
   <h3>Suggested times</h3>
-  <span>{{ day.total_minutes }} min planned · {{ student.daily_minutes }} available</span>
+  <span>{{ day.total_minutes }} min planned</span>
 </div>
 
 {% if sched.verdict != 'fits' %}
@@ -201,7 +201,7 @@
     <a class="btn {{ 'ghost' if revisions else '' }}" href="/revise">
       {{ 'Log more murajaat' if revisions else 'Log murajaat' }}
     </a>
-    <a class="btn ghost" href="/log-class">Log murajaat class</a>
+    <a class="btn ghost" href="/log-class">Log a class</a>
   </div>
   {% if not revisions and not classes %}
   <p class="hint">

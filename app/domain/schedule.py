@@ -33,10 +33,43 @@ MINUTES_PER_TASMEE_SITTING = 20
 ATTENTION_BLOCK_MINUTES = 25
 
 
+# What a student picks in the UI. Stored as minutes because every duration in
+# the app is minutes, but nobody thinks about their day in units of 45.
+HOUR_CHOICES = [0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4]
+
+
+def hours_to_minutes(hours: float) -> int:
+    return max(15, int(round(float(hours) * 60)))
+
+
+def minutes_to_hours(minutes: int) -> float:
+    """Snapped to the nearest offered choice so the select always has a match."""
+    hours = (minutes or 60) / 60
+    return min(HOUR_CHOICES, key=lambda h: abs(h - hours))
+
+
+def format_hours(hours: float) -> str:
+    if hours == 0.5:
+        return "30 minutes"
+    if hours == 0.75:
+        return "45 minutes"
+    if hours == 1:
+        return "1 hour"
+    return f"{hours:g} hours"
+
+
 @dataclass
 class TimeBudget:
     daily_minutes: int
     active_days: str = dt.ALL_DAYS_ON
+
+    @property
+    def daily_hours(self) -> float:
+        return minutes_to_hours(self.daily_minutes)
+
+    @property
+    def daily_text(self) -> str:
+        return format_hours(self.daily_hours)
 
     @property
     def days_per_week(self) -> int:

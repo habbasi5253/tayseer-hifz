@@ -13,9 +13,14 @@ from app.config import settings
 from app.db import get_session
 from app.deps import check_csrf, get_current_user, redirect, render, require_user
 from app.domain import dates as dt
-from app.domain.marhala import marhala_choices
 from app.domain.quran import JUZ_COUNT
-from app.models import MuhaffizProfile, StudentProfile, User
+from app.domain.schedule import (
+    HOUR_CHOICES,
+    format_hours,
+    hours_to_minutes,
+    minutes_to_hours,
+)
+from app.models import StudentProfile, User
 from app.security import (
     check_password_strength,
     hash_password,
@@ -103,11 +108,10 @@ def register(
     email: str = Form(...),
     password: str = Form(...),
     timezone: str = Form("UTC"),
-    role: str = Form("student"),
     db: Session = Depends(get_session),
 ):
     email = email.strip().lower()
-    ctx = {"user": None, "db": db, "zones": COMMON_ZONES, "name": name, "email": email, "role": role}
+    ctx = {"user": None, "db": db, "zones": COMMON_ZONES, "name": name, "email": email}
 
     if db.execute(select(User).where(User.email == email)).scalar_one_or_none():
         return render(request, "auth/register.html", {**ctx, "error": "That email is already registered."})
@@ -124,20 +128,17 @@ def register(
         name=name.strip() or email,
         password_hash=hash_password(password),
         timezone=timezone,
-        is_student=role in ("student", "both"),
-        is_muhaffiz=role in ("muhaffiz", "both"),
+        # Every account is a student. This is a personal progress log — what a
+        # Muhaffiz decides in class is recorded by the student afterwards, so
+        # there is no second role to choose between at sign-up.
+        is_student=True,
     )
     db.add(user)
     db.flush()
-
-    if user.is_student:
-        db.add(StudentProfile(user_id=user.id))
-    if user.is_muhaffiz:
-        db.add(MuhaffizProfile(user_id=user.id))
+    db.add(StudentProfile(user_id=user.id))
     db.commit()
 
-    dest = "/onboarding" if user.is_student else "/muhaffiz"
-    return _set_session(redirect(dest, f"Welcome, {user.name}."), user.id)
+    return _set_session(redirect("/onboarding", f"Welcome, {user.name}."), user.id)
 
 
 # --- Onboarding --------------------------------------------------------------
@@ -149,15 +150,6 @@ def onboarding(request: Request, db: Session = Depends(get_session)):
     if not user.student:
         return redirect("/muhaffiz")
 
-    muhaffizin = list(
-        db.execute(
-            select(MuhaffizProfile).join(User, MuhaffizProfile.user_id == User.id).order_by(User.name)
-        )
-        .scalars()
-        .all()
-    )
-    from app import services
-
     return render(
         request,
         "auth/onboarding.html",
@@ -165,11 +157,11 @@ def onboarding(request: Request, db: Session = Depends(get_session)):
             "user": user,
             "db": db,
             "student": user.student,
-            "muhaffizin": muhaffizin,
             "zones": COMMON_ZONES,
             "juz_range": range(1, JUZ_COUNT + 1),
-            "assignments": services.active_assignments(db, user.student.id),
-            "marahil": marhala_choices(),
+            "hour_choices": HOUR_CHOICES,
+            "current_hours": minutes_to_hours(user.student.daily_minutes),
+            "format_hours": format_hours,
         },
     )
 
@@ -180,12 +172,11 @@ def save_onboarding(
     csrf_token: str = Form(...),
     marhala: int = Form(1),
     current_juz: int = Form(1),
-    daily_minutes: int = Form(30),
+    daily_hours: float = Form(1.0),
     preferred_method: int = Form(2),
     timezone: str = Form("UTC"),
     day: Optional[List[str]] = Form(None),
-    stage1_muhaffiz: Optional[str] = Form(None),
-    stage2_muhaffiz: Optional[str] = Form(None),
+    prior_juz_done: Optional[str] = Form(None),
     db: Session = Depends(get_session),
 ):
     from app import services
@@ -201,7 +192,7 @@ def save_onboarding(
 
     student.marhala = int(marhala)
     student.current_juz = max(1, min(JUZ_COUNT, int(current_juz)))
-    student.daily_minutes = max(5, min(600, int(daily_minutes)))
+    student.daily_minutes = hours_to_minutes(daily_hours)
     student.preferred_method = int(preferred_method)
 
     # Checkbox group -> 7-char mask. Absent means every day is active.
@@ -213,20 +204,18 @@ def save_onboarding(
     if "1" not in student.active_days:
         student.active_days = dt.ALL_DAYS_ON
 
-    error = None
-    for raw, stage in ((stage1_muhaffiz, "stage1"), (stage2_muhaffiz, "stage2")):
-        if raw:
-            try:
-                services.assign_muhaffiz(
-                    db, student_id=student.id, muhaffiz_id=int(raw), stage=stage
-                )
-            except services.ProgramRuleViolation as exc:
-                error = str(exc)
+    # Somebody starting at juz 10 has already done the nine before it. Ticking
+    # 180 pages to say so would be absurd, so it is assumed unless they say
+    # otherwise.
+    filled = []
+    if prior_juz_done is not None:
+        filled = services.backfill_prior_juz(db, student, student.current_juz)
 
     db.commit()
-    if error:
-        return redirect("/onboarding", error, error=True)
-    return redirect("/", "Setup saved.")
+    msg = "Setup saved."
+    if filled:
+        msg = f"Setup saved. {len(filled)} earlier juz marked complete."
+    return redirect("/", msg)
 
 
 # --- Settings ----------------------------------------------------------------
@@ -237,7 +226,6 @@ def settings_page(request: Request, db: Session = Depends(get_session)):
     from app import services
 
     user = require_user(request, db)
-    assignments = services.active_assignments(db, user.student.id) if user.student else []
     return render(
         request,
         "auth/settings.html",
@@ -246,7 +234,9 @@ def settings_page(request: Request, db: Session = Depends(get_session)):
             "db": db,
             "student": user.student,
             "zones": COMMON_ZONES,
-            "assignments": assignments,
+            "hour_choices": HOUR_CHOICES,
+            "current_hours": minutes_to_hours(user.student.daily_minutes) if user.student else 1,
+            "format_hours": format_hours,
         },
     )
 
@@ -259,7 +249,10 @@ def save_settings(
     timezone: str = Form("UTC"),
     reminder_hour: int = Form(19),
     email_notifications: Optional[str] = Form(None),
-    daily_minutes: Optional[int] = Form(None),
+    notify_hifz: Optional[str] = Form(None),
+    notify_activity: Optional[str] = Form(None),
+    notify_progress: Optional[str] = Form(None),
+    daily_hours: Optional[float] = Form(None),
     wake_hour: Optional[int] = Form(None),
     juz_order: Optional[str] = Form(None),
     evening_hour: Optional[int] = Form(None),
@@ -274,10 +267,13 @@ def save_settings(
         user.timezone = timezone
     user.reminder_hour = max(0, min(23, int(reminder_hour)))
     user.email_notifications = email_notifications is not None
+    user.notify_hifz = notify_hifz is not None
+    user.notify_activity = notify_activity is not None
+    user.notify_progress = notify_progress is not None
 
     if user.student:
-        if daily_minutes is not None:
-            user.student.daily_minutes = max(5, min(600, int(daily_minutes)))
+        if daily_hours is not None:
+            user.student.daily_minutes = hours_to_minutes(daily_hours)
         if juz_order is not None:
             # Blank clears it back to the default 1..30. `parse_juz_order`
             # rejects anything that is not a complete permutation, so a typo

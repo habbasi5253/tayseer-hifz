@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Set up · {{ app_name }}{% endblock %}
-{% block subtitle %}setup{% endblock %}
+{% block subtitle %}Setup{% endblock %}
 {% block body %}
 
 <div class="card">
@@ -13,26 +13,43 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
   <div class="card">
-    <h3>Position</h3>
-    <label for="current_juz">Current juz</label>
+    <h3>Your position</h3>
+    <label for="current_juz">Juz you are working on now</label>
     <select id="current_juz" name="current_juz">
       {% for j in juz_range %}
       <option value="{{ j }}" {{ 'selected' if student.current_juz == j }}>Juz {{ j }}</option>
       {% endfor %}
     </select>
 
-    <label for="timezone">Timezone</label>
+    <label class="pick" style="margin-top:12px">
+      <input type="checkbox" name="prior_juz_done" checked
+             style="position:static;opacity:1;width:20px;height:20px;min-height:0;accent-color:var(--primary)">
+      <span class="pick-body" style="border:0;padding:6px 0;background:transparent">
+        <span class="pick-title">I have already memorized the juz before this one</span>
+        <span class="pick-blurb">
+          They will be marked complete so you are not ticking hundreds of pages by hand.
+          Untick this if you are starting fresh or took them out of order.
+        </span>
+      </span>
+    </label>
+
+    <label for="timezone">Time zone</label>
     <select id="timezone" name="timezone">
-      {% for z in zones %}<option value="{{ z }}" {{ 'selected' if user.timezone == z }}>{{ z.replace('_',' ') }}</option>{% endfor %}
+      {% for z in zones %}
+      <option value="{{ z }}" {{ 'selected' if user.timezone == z }}>{{ z.replace('_', ' ') }}</option>
+      {% endfor %}
     </select>
   </div>
 
   <div class="card">
     <h3>Your time</h3>
-    <label for="daily_minutes">Minutes you realistically have each day</label>
-    <input id="daily_minutes" name="daily_minutes" type="number" min="5" max="600"
-           value="{{ student.daily_minutes }}" inputmode="numeric">
-    <p class="hint">Be honest rather than aspirational — the schedule is built from this number.</p>
+    <label for="daily_hours">Time you have on a normal day</label>
+    <select id="daily_hours" name="daily_hours">
+      {% for h in hour_choices %}
+      <option value="{{ h }}" {{ 'selected' if current_hours == h }}>{{ format_hours(h) }}</option>
+      {% endfor %}
+    </select>
+    <p class="hint">Be honest rather than aspirational — your daily plan is built from this.</p>
 
     <label>Days you will work</label>
     <div class="days">
@@ -44,36 +61,14 @@
     </div>
     <p class="hint">A day off should stay a day off, not become catch-up day.</p>
 
-    
-
     <label for="preferred_method">Usual revision method</label>
     <select id="preferred_method" name="preferred_method">
       {% for m in method_choices() %}
-      <option value="{{ m.rank }}" {{ 'selected' if student.preferred_method == m.rank }}>{{ m.rank }}. {{ m.label }}</option>
+      <option value="{{ m.rank }}" {{ 'selected' if student.preferred_method == m.rank }}>
+        {{ m.rank }}. {{ m.label }}
+      </option>
       {% endfor %}
     </select>
-  </div>
-
-  <div class="card">
-    <h3>Your Muhaffiz</h3>
-    {% if muhaffizin %}
-      <label for="stage1_muhaffiz">Stage 1 — memorization &amp; sign-off</label>
-      <select id="stage1_muhaffiz" name="stage1_muhaffiz">
-        <option value="">Not assigned yet</option>
-        {% for m in muhaffizin %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
-      </select>
-
-      <label for="stage2_muhaffiz">Stage 2 — tasmee</label>
-      <select id="stage2_muhaffiz" name="stage2_muhaffiz">
-        <option value="">Not assigned yet</option>
-        {% for m in muhaffizin %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
-      </select>
-      <p class="hint">These must be two different people — the programme requires a second, separate
-        Muhaffiz for evaluation, and the app will refuse to save the same person for both.</p>
-    {% else %}
-      <p class="muted tiny mb0">No Muhaffiz accounts exist yet. Ask yours to register, then come back
-        to Settings and link them.</p>
-    {% endif %}
   </div>
 
   <button class="btn block" type="submit">Save and start</button>

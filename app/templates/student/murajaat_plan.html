@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Murajaat schedule · {{ app_name }}{% endblock %}
-{% block subtitle %}murajaat schedule{% endblock %}
+{% block subtitle %}Murajaat schedule{% endblock %}
 {% block body %}
 
 <div class="card">
@@ -16,8 +16,11 @@
 <div class="card">
   <div class="empty">
     <div class="mark">◌</div>
-    <p>No juz to revise yet.</p>
-    <p class="tiny mb0">Juz appear here once your Stage 2 Muhaffiz has passed them.</p>
+    <p>Nothing to schedule yet.</p>
+    <p class="tiny mb0">
+      Juz appear here once you have memorized them. If you already know some, set your
+      current juz in <a href="/onboarding">setup</a> and the earlier ones will be filled in.
+    </p>
   </div>
 </div>
 {% else %}

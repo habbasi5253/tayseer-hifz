@@ -442,8 +442,11 @@ nav.tabs a.on svg { stroke-width: 2.2; }
 
 label { display: block; font-size: .81rem; font-weight: 650; color: var(--ink-soft);
         margin: 13px 0 5px; }
-input[type=text], input[type=email], input[type=password], input[type=number],
-input[type=date], select, textarea {
+/* Matched by exclusion rather than by listing types: an <input> with no type
+   attribute defaults to text but does NOT match input[type=text], which left
+   the "Your name" field unstyled and half-width on the register form. */
+input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=hidden]),
+select, textarea {
   width: 100%; min-height: var(--tap); padding: 11px 13px;
   border: 1px solid var(--line); border-radius: var(--r-md);
   background: var(--surface); color: var(--ink);
@@ -654,3 +657,36 @@ details.page-row > summary::-webkit-details-marker { display: none; }
   body { background: #fff; padding: 0; }
   .card, .hero, .focus { box-shadow: none; break-inside: avoid; }
 }
+
+/* --- Juz picker -------------------------------------------------------------
+   One row per juz with three portion toggles. A grid of 30 plain checkboxes was
+   unreadable on a phone, and a <select multiple> hides everything not scrolled
+   to — this keeps every juz visible and every choice one tap. */
+
+.juzpick { display: flex; flex-direction: column; gap: 5px; }
+.juzpick-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 8px; border-radius: var(--r-sm);
+  border: 1px solid transparent;
+}
+.juzpick-row.is-planned { background: var(--primary-soft); border-color: var(--primary); }
+.juzpick-num {
+  flex: none; width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: var(--surface-3); color: var(--ink-soft);
+  font-weight: 700; font-size: .82rem; letter-spacing: -.02em;
+}
+.juzpick-row.is-planned .juzpick-num { background: var(--primary); color: #fff; }
+.juzpick-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; flex: 1; }
+.juzpick-opts label { margin: 0; position: relative; }
+.juzpick-opts input { position: absolute; opacity: 0; pointer-events: none; }
+.juzpick-opts span {
+  display: grid; place-items: center; min-height: 38px; padding: 4px;
+  border: 1.5px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface);
+  font-size: .74rem; font-weight: 620; color: var(--ink-faint); cursor: pointer;
+}
+.juzpick-opts input:checked + span {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+.juzpick-opts input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }

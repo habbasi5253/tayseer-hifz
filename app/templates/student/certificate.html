@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "partials/components.html" as ui %}
 {% block title %}Juz {{ c.juz }} · {{ app_name }}{% endblock %}
-{% block subtitle %}juz {{ c.juz }}{% endblock %}
+{% block subtitle %}Juz {{ c.juz }}{% endblock %}
 {% block body %}
 
 {# --- The certificate itself ------------------------------------------------ #}
@@ -28,6 +28,69 @@
     <p class="tiny mb0"><strong>Next:</strong> {{ c.next_action }}</p>
   </div>
 </div>
+
+{# --- Record what happened in class ---------------------------------------- #}
+<a id="signoff"></a>
+{% if face and (face.submitted or face.memorized_unsubmitted) %}
+<div class="card" style="border-color:var(--amber)">
+  <h3>Record your sign-off</h3>
+  <p class="faint tiny">
+    Tick the pages your Muhaffiz passed. Anything left unticked comes back to be recited
+    again, and new pages stay closed until it does.
+  </p>
+  <form method="post" action="/record-signoff">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="juz" value="{{ c.juz }}">
+    {% for pg in (face.submitted or face.memorized_unsubmitted)|sort %}
+    <label class="pick">
+      <input type="checkbox" name="page" value="{{ pg }}" checked hidden>
+      <span class="pick-body" style="display:flex;align-items:center;gap:10px">
+        <input class="chk" type="checkbox" name="ok_{{ pg }}" checked>
+        <span>
+          <span class="pick-title">Page {{ pg|pageindex }}</span>
+          <span class="pick-blurb">Ticked means signed off</span>
+        </span>
+      </span>
+    </label>
+    {% endfor %}
+    <button class="btn block mt" type="submit">Save</button>
+  </form>
+</div>
+{% endif %}
+
+{% if window and window.has_started and not window.is_passed %}
+<div class="card" style="border-color:var(--primary)">
+  <h3>Record tasmee</h3>
+  <p class="faint tiny">
+    Pages you recited to your second Muhaffiz. Tasmee runs in order from page 1.
+  </p>
+  <form method="post" action="/record-tasmee">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="juz" value="{{ c.juz }}">
+    <div class="pagegrid" style="margin:10px 0">
+      {% for p in pages %}
+      {% set done = window.page_status(p.page) == 'passed' %}
+      <label style="margin:0">
+        <input type="checkbox" name="page" value="{{ p.page }}" {{ 'disabled' if done }}
+               style="position:absolute;opacity:0;pointer-events:none">
+        <span class="pg {{ 's-current' if done else 's-never' }}"
+              style="cursor:{{ 'default' if done else 'pointer' }}">{{ p.index }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    <button class="btn block" type="submit">Save recited pages</button>
+  </form>
+
+  {% if window.pages_remaining == 0 %}
+  <form method="post" action="/record-juz-passed" class="mt">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="juz" value="{{ c.juz }}">
+    <button class="btn block" type="submit">My Muhaffiz passed juz {{ c.juz }}</button>
+  </form>
+  <p class="hint">This opens the next juz.</p>
+  {% endif %}
+</div>
+{% endif %}
 
 {# --- The 30-day tasmee window --------------------------------------------- #}
 {% if window and window.has_started %}
