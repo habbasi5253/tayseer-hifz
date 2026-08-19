@@ -1,0 +1,11 @@
+# Only the Vercel entrypoint lives here. Deliberately no [project] table:
+# adding one would make Vercel treat this file as the dependency source and
+# ignore requirements.txt.
+#
+# The entrypoint is given as a MODULE path rather than left to file discovery.
+# `app/main.py` is a discoverable filename, but loading it as a bare file makes
+# its own `from app.config import ...` imports depend on the project root
+# happening to be on sys.path. Naming the module makes Python import it as part
+# of the `app` package, which is unambiguous.
+[tool.vercel]
+entrypoint = "app.main:app"

@@ -15,7 +15,6 @@ from app.config import BASE_DIR, settings
 from app.db import get_session, run_migrations
 from app.deps import Redirect, require_muhaffiz, require_user
 from app import notifications
-from app.report import build_report
 from app.routes import auth, muhaffiz, student
 
 logging.basicConfig(level=logging.INFO if settings.debug else logging.WARNING)
@@ -36,7 +35,14 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, docs_url=None, redoc_url=None, lifespan=lifespan)
-app.mount("/static", StaticFiles(directory=str(BASE_DIR / "app" / "static")), name="static")
+app.mount(
+    "/static",
+    # check_dir=False: Vercel promotes these to its CDN at build time and the
+    # directory may not survive into the function bundle. Raising at import over
+    # a file the CDN already serves would take the whole app down.
+    StaticFiles(directory=str(BASE_DIR / "app" / "static"), check_dir=False),
+    name="static",
+)
 
 
 @app.exception_handler(Redirect)
@@ -73,6 +79,8 @@ app.include_router(muhaffiz.router)
 
 @app.get("/report.pdf")
 def my_report(request: Request, db: Session = Depends(get_session)):
+    from app.report import build_report
+
     user = require_user(request, db)
     if not user.student:
         raise HTTPException(403, "Only students have a progress report.")
@@ -88,6 +96,7 @@ def my_report(request: Request, db: Session = Depends(get_session)):
 @app.get("/muhaffiz/student/{student_id}/report.pdf")
 def student_report(student_id: int, request: Request, db: Session = Depends(get_session)):
     from app import services
+    from app.report import build_report
 
     m = require_muhaffiz(request, db)
     target = services.get_student(db, student_id)
