@@ -37,19 +37,13 @@
       <div class="juzpick-row {{ 'is-planned' if on_plan }}">
         <span class="juzpick-num">{{ j }}</span>
         <div class="juzpick-opts">
+          {% for pk in portions %}
           <label>
-            <input type="checkbox" name="juz_portion" value="{{ j }}:full"
-                   {{ 'checked' if j == selected and not on_plan }}>
-            <span>Whole</span>
+            <input type="checkbox" name="juz_portion" value="{{ j }}:{{ pk }}"
+                   {{ 'checked' if pk == 'full' and j == selected and not on_plan }}>
+            <span>{{ portion_label[pk] }}</span>
           </label>
-          <label>
-            <input type="checkbox" name="juz_portion" value="{{ j }}:first_half">
-            <span>1st half</span>
-          </label>
-          <label>
-            <input type="checkbox" name="juz_portion" value="{{ j }}:second_half">
-            <span>2nd half</span>
-          </label>
+          {% endfor %}
         </div>
       </div>
       {% endfor %}

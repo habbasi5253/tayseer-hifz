@@ -1,9 +1,23 @@
 {
+  "id": "/",
   "name": "Tayseer Hifz Tracker",
   "short_name": "Tayseer",
+  "description": "Track your hifz through the Barnamaj Tayseer programme: pages memorized, tasmee windows, and your murajaat schedule.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#fbf8f3",
-  "theme_color": "#1f5c46",
-  "description": "Barnamaj Tayseer hifz tracking for students and their Muhaffiz."
+  "orientation": "portrait",
+  "background_color": "#f4f6f5",
+  "theme_color": "#f4f6f5",
+  "categories": ["education", "lifestyle"],
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/static/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Log murajaat", "url": "/revise" },
+    { "name": "Certificates", "url": "/certificates" }
+  ]
 }

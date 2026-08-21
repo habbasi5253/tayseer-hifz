@@ -293,7 +293,9 @@ class Portion:
         FIRST_HALF: "First half",
         SECOND_HALF: "Second half",
     }
-    SHORT = {FULL: "whole", FIRST_HALF: "1st half", SECOND_HALF: "2nd half"}
+    # Toggle labels. Short enough for three side-by-side columns on a phone,
+    # and shared by the revise and schedule pickers so the two cannot drift.
+    SHORT = {FULL: "Whole", FIRST_HALF: "1st half", SECOND_HALF: "2nd half"}
     # Share of a juz, used to scale the time estimate.
     FRACTION = {FULL: 1.0, FIRST_HALF: 0.5, SECOND_HALF: 0.5}
 

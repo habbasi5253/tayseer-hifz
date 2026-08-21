@@ -681,7 +681,9 @@ details.page-row > summary::-webkit-details-marker { display: none; }
 .juzpick-opts label { margin: 0; position: relative; }
 .juzpick-opts input { position: absolute; opacity: 0; pointer-events: none; }
 .juzpick-opts span {
-  display: grid; place-items: center; min-height: 38px; padding: 4px;
+  /* 44px is Apple's minimum touch target, and this grid is the densest thing
+     in the app — seven days of it on the schedule page. */
+  display: grid; place-items: center; min-height: 44px; padding: 4px;
   border: 1.5px solid var(--line); border-radius: var(--r-sm);
   background: var(--surface);
   font-size: .74rem; font-weight: 620; color: var(--ink-faint); cursor: pointer;

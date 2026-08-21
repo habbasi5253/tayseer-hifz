@@ -33,20 +33,20 @@
       <h3 class="mb0">{{ weekdays[d] }}</h3>
       <span class="faint nano">{{ chosen|length }} scheduled</span>
     </div>
-    <div style="margin-top:10px">
+    <div class="juzpick mt">
       {% for j in available %}
-      <div class="row wrap-row" style="gap:6px;margin-bottom:6px;align-items:center">
-        <span class="badge-num neutral" style="width:30px;height:30px;font-size:.76rem">{{ j }}</span>
-        {% for pk in portions %}
-        {% set on = chosen | selectattr('juz','equalto',j) | selectattr('portion','equalto',pk) | list %}
-        <label style="margin:0">
-          <input type="checkbox" name="slot" value="{{ d }}:{{ j }}:{{ pk }}"
-                 {{ 'checked' if on }} style="position:absolute;opacity:0;pointer-events:none">
-          <span class="pill {{ 'good' if on else 'neutral' }}" style="cursor:pointer;padding:6px 11px">
-            {{ portion_label[pk] }}
-          </span>
-        </label>
-        {% endfor %}
+      {% set on_day = chosen | selectattr('juz', 'equalto', j) | list %}
+      <div class="juzpick-row {{ 'is-planned' if on_day }}">
+        <span class="juzpick-num">{{ j }}</span>
+        <div class="juzpick-opts">
+          {% for pk in portions %}
+          <label>
+            <input type="checkbox" name="slot" value="{{ d }}:{{ j }}:{{ pk }}"
+                   {{ 'checked' if chosen | selectattr('juz','equalto',j) | selectattr('portion','equalto',pk) | list }}>
+            <span>{{ portion_label[pk] }}</span>
+          </label>
+          {% endfor %}
+        </div>
       </div>
       {% endfor %}
     </div>
@@ -56,16 +56,4 @@
   <div style="height:20px"></div>
 </form>
 {% endif %}
-{% endblock %}
-{% block scripts %}
-<script>
-  // The pill is the control; reflect its checkbox state without a round trip.
-  document.querySelectorAll('input[name="slot"]').forEach(function (box) {
-    box.addEventListener('change', function () {
-      var pill = box.nextElementSibling;
-      pill.classList.toggle('good', box.checked);
-      pill.classList.toggle('neutral', !box.checked);
-    });
-  });
-</script>
 {% endblock %}

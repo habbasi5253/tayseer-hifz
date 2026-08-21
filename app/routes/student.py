@@ -127,6 +127,8 @@ def revise_form(request: Request, juz: Optional[int] = None, db: Session = Depen
             "mix": services.method_mix_for(db, student, juz=selected, now=now),
             "nudge": services.method_nudge_for(db, student, juz=selected, now=now),
             "planned": services.planned_murajaat_for(db, student, today),
+            "portions": Portion.ALL,
+            "portion_label": Portion.SHORT,
             "recent": services.recent_revision_logs(db, student.id, limit=8),
             "streak": services.streak_for(db, student, now=now),
         },
@@ -354,7 +356,7 @@ def murajaat_plan_form(request: Request, db: Session = Depends(get_session)):
             "by_day": by_day,
             "weekdays": dt.WEEKDAY_NAMES,
             "portions": Portion.ALL,
-            "portion_label": Portion.LABEL,
+            "portion_label": Portion.SHORT,
         },
     )
 
